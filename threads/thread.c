@@ -204,6 +204,11 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  if(thread_current()->priority < priority)
+  {
+    thread_yield ();
+  }
+
   return tid;
 }
 
@@ -341,9 +346,23 @@ thread_foreach (thread_action_func *func, void *aux)
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
-thread_set_priority (int new_priority) 
+thread_set_priority(int new_priority)
 {
-  thread_current ()->priority = new_priority;
+  if(thread_mlfqs)
+    return;
+  enum intr_level old_level = intr_disable();
+
+  struct thread* current_thread = thread_current();
+  int old_priority = current_thread->priority;
+  current_thread->base_priority = new_priority;
+
+  if(list_empty(&current_thread->locks) || new_priority > old_priority)
+  {
+    current_thread->priority = new_priority;
+    thread_yield();
+  }
+
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -472,6 +491,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+  // 初始化新增的属性
+  t->base_priority = priority;
+  list_init(&t->locks);
+  t->lock_waiting = NULL;
+
   old_level = intr_disable ();
   
   // 修改为按优先级插入
@@ -588,7 +612,7 @@ allocate_tid (void)
 
   return tid;
 }
-
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
@@ -614,4 +638,63 @@ blocked_time_check(struct thread *th, void *aux)
 bool thread_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
   return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
+}
+
+/* 让线程获得锁 */
+void thread_hold_the_lock(struct lock *lock)
+{
+  enum intr_level old_level = intr_disable(); /* 原子操作 */
+  // 当前线程拥有的锁队列里面插入lock
+  list_insert_ordered(&thread_current()->locks, &lock->elem, thread_pr_cmp, NULL);
+
+  // 更新锁的最大优先级
+  if (lock->max_prioroty > thread_current()->priority)
+  {
+    thread_current()->priority = lock->max_prioroty;
+    thread_yield();
+  }
+
+  intr_set_level(old_level); /* 原子操作结束 */
+}
+
+/* 将当前的优先级捐赠给线程T */
+void thread_donate_priority(struct thread *t)
+{
+  enum intr_level old_level = intr_disable();
+  thread_update_priority(t);
+  if (t->status == THREAD_READY)
+  {
+    list_remove(&t->elem);
+    list_insert_ordered(&ready_list, &t->elem, thread_pr_cmp, NULL);
+  }
+  intr_set_level(old_level);
+}
+/* 移除锁 */
+void
+thread_remove_lock (struct lock *lock)
+{
+  enum intr_level old_level = intr_disable ();
+  list_remove (&lock->elem);
+  thread_update_priority (thread_current ());
+  intr_set_level (old_level);
+}
+/* 更新线程的优先级 */
+void 
+thread_update_priority(struct thread *t)
+{
+  enum intr_level old_level = intr_disable();
+  int max_priority = t->base_priority;
+  int lock_priority;
+
+  if(!list_empty(&t->locks))
+  {
+    list_sort(&t->locks,lock_cmp_priority,NULL); /* 将线程拥有的锁按优先级排序 */
+    /* 第一个锁的优先级是优先级最大的 */
+    lock_priority = list_entry(list_front(&t->locks),struct lock,elem)->max_prioroty;
+    if(lock_priority > max_priority)
+      max_priority = lock_priority;
+  }
+  t->priority = max_priority;
+  // printf("%d %d\n",max_priority, t->priority);
+  intr_set_level(old_level);
 }

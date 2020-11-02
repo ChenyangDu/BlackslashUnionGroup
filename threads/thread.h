@@ -90,6 +90,9 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     int64_t blocked_time;           /*Time to be blocked. Designed for Project 1 Part 1 */ 
+    int base_priority;              /* 线程原本的优先级 */
+    struct list locks;              /* 线程拥有的锁 */
+    struct lock *lock_waiting;      /* 正在等待的锁 */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -136,7 +139,14 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 // 新建了比较线程优先级的函数
-bool thread_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool thread_pr_cmp (const struct list_elem *, const struct list_elem *, void *);
+/* 让线程获得锁 */
+void thread_hold_the_lock(struct lock *);
+/* 将当前的优先级捐赠给线程T */
+void thread_donate_priority(struct thread *);
+void thread_remove_lock (struct lock *);
+void thread_update_priority(struct thread *);
+
 
 int thread_get_nice (void);
 void thread_set_nice (int);
