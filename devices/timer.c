@@ -177,9 +177,24 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
+  enum intr_level old_level = intr_disable();
+
   ticks++;
   thread_tick ();
   thread_foreach(blocked_time_check,NULL);
+
+  /* 如果多级反馈队列调度 */
+  if (thread_mlfqs)
+  {
+    /* 当前线程的cup+1 */
+    thread_mlfqs_increase_recent_cpu_by_one ();
+    if (ticks % TIMER_FREQ == 0)
+      thread_mlfqs_update_load_avg_and_recent_cpu ();
+    else if (ticks % 4 == 0)
+      thread_mlfqs_update_priority (thread_current ());
+  }
+
+  intr_set_level(old_level);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
