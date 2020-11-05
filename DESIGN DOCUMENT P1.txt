@@ -95,16 +95,14 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-typedef int fixed_t;                /* 用于浮点计算 */
+typedef int fixed_t;               /* 用于浮点计算 */
 
 struct thread 结构体中加入以下成员变量
-int nice;                           /* 题目中要求的nice */
-fixed_t recent_cpu;                 /* 题目中要求的cecent_cpu */
+	int nice;                      /* 题目中要求的nice */
+	fixed_t recent_cpu;            /* 题目中要求的rcecent_cpu */
 
 thread.c中加入全局变量
-fixed_t load_avg;                   /* 题目中要求的load_avg */
-
-
+	fixed_t load_avg;              /* 题目中要求的load_avg */
 
 ---- ALGORITHMS ----
 
@@ -116,20 +114,25 @@ fixed_t load_avg;                   /* 题目中要求的load_avg */
 timer  recent_cpu    priority   thread
 ticks   A   B   C   A   B   C   to run
 -----  --  --  --  --  --  --   ------
- 0
- 4
- 8
-12
-16
-20
-24
-28
-32
-36
+ 0		0	0	0	63	61	59	A
+ 4		4	0	0	62	61	59	A
+ 8		8	0	0	61	61	59	B
+12		8	4	0	61	60	59	A
+16		12	4	0	60	60	59	B
+20		12	8	0	60	59	59	A
+24		16	8	0	59	59	59	C
+28		16	8	4	59	59	58	B
+32		16	12	4	59	58	58	A
+36		20	12	4	58	58	58	C
 
 >> C3: Did any ambiguities in the scheduler specification make values
 >> in the table uncertain?  If so, what rule did you use to resolve
 >> them?  Does this match the behavior of your scheduler?
+
+在多个线程的优先级相同的时候，选择优先级最大的线程是不确定的。为了解决该问题，
+我们修改了线程优先级的比较函数，以优先级为第一关键字，线程的recent_cpu为第二
+关键字，线程的nice为第三关键字，如果两个线程的优先级、recent_cpu、nice都相同
+那么就随机选取一个线程。
 
 >> C4: How is the way you divided the cost of scheduling between code
 >> inside and outside interrupt context likely to affect performance?
