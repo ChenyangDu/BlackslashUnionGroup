@@ -137,12 +137,30 @@ ticks   A   B   C   A   B   C   to run
 >> C4: How is the way you divided the cost of scheduling between code
 >> inside and outside interrupt context likely to affect performance?
 
+如果CPU花太多时间进用来计算recent_cpu，load_avg和priority的计算，那么在执
+行抢占之前，线程将花费大量时间。这样，该线程将无法获得预期的足够的运行时间，
+并且将运行更长的时间。这将导致自己占用更多的CPU时间，并会提高load_avg，导致
+降低优先级。因此，如果在中断上下文中进行调度的成本增加，则会降低性能。所以我
+们在每4个tick之后才进行一次计算，更新recent_cpu和nice等相关值。
+
+
 ---- RATIONALE ----
 
 >> C5: Briefly critique your design, pointing out advantages and
 >> disadvantages in your design choices.  If you were to have extra
 >> time to work on this part of the project, how might you choose to
 >> refine or improve your design?
+
+优点：
+1、在原有系统的基础上只做了少量的修改，新添加的数据结构和变量较少，尽可能优化
+原有系统。
+2、浮点运算利用了系统原有的int类型，利用位运算等操作提升计算速度。
+
+缺点：
+1、在本次实验中，我们只选用了一个队列来存储所有等待调用的线程，而线程的优先级只
+有64个，那么就会包含很多相同优先级的线程，在多级反馈队列调度算法中，应当使用
+多个队列来存储等待调度的线程，每个队列内含有若干个相同优先级的线程。
+2、浮点运算方面采用了函数来计算，如果用define来定义会提升更多的性能。
 
 			   SURVEY QUESTIONS
 			   ================
