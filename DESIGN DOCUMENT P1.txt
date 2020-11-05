@@ -30,6 +30,10 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+添加到结构体thread（struct thread）
+	/*被原有函数timer_sleep(),thread_create()和新建函数blocked_time_check所引用*/
+	int64_t blocked_time /*用于记录所设置的阻塞时间*/
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),

@@ -90,7 +90,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-    int64_t blocked_time;           /*Time to be blocked. Designed for Project 1 Part 1 */ 
+    int64_t blocked_time;           /* 线程等待时间 */ 
     int base_priority;              /* 线程原本的优先级 */
     struct list locks;              /* 线程拥有的锁 */
     struct lock *lock_waiting;      /* 正在等待的锁 */
