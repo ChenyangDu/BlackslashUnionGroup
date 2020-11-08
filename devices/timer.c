@@ -98,7 +98,8 @@ timer_sleep (int64_t ticks)
   enum intr_level old_level;
   old_level = intr_disable ();
   struct thread *cur = thread_current ();
-  cur->blocked_time = cur->blocked_time + ticks;
+  cur->blocked_time = ticks;
+  sleeping_list_insert(cur);
   thread_block();
   intr_set_level (old_level);
 }
@@ -181,7 +182,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 
   ticks++;
   thread_tick ();
-  thread_foreach(blocked_time_check,NULL);
+  sleeping_thread_foreach(blocked_time_check,NULL);
 
   /* 如果多级反馈队列调度 */
   if (thread_mlfqs)

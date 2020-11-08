@@ -38,6 +38,9 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+/* timer_sleep()中所使用的睡眠队列 */
+static struct list sleeping_list;
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -95,6 +98,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleeping_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -345,6 +349,31 @@ thread_foreach (thread_action_func *func, void *aux)
     {
       struct thread *t = list_entry (e, struct thread, allelem);
       func (t, aux);
+    }
+}
+
+/* 模仿thread_for_each创造相应的对每个睡眠队列进行操作 */
+void sleeping_thread_foreach (thread_action_func *func, void *aux)
+{
+  struct list_elem *e;
+  struct thread *t_prev;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&sleeping_list); e != list_end (&sleeping_list);
+       e = list_next (e))
+    {
+      if(t_prev!=NULL&&t_prev->blocked_time==0)
+      {
+        list_remove(&t_prev->elem);
+      }
+      struct thread *t = list_entry (e, struct thread, elem);
+      func (t, aux);
+      t_prev=t;
+    }
+    if(t_prev!=NULL&&t_prev->blocked_time==0)
+    {
+      list_remove(&t_prev->elem);
     }
 }
 
@@ -623,6 +652,7 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 
+//阻塞时间检测
 void 
 blocked_time_check(struct thread *th, void *aux)
 {
@@ -639,6 +669,16 @@ blocked_time_check(struct thread *th, void *aux)
     }
     return;
 }
+
+//插入睡眠队列
+void 
+sleeping_list_insert(struct thread *th) 
+{
+  list_push_back(&sleeping_list,&th->elem);
+}
+
+
+
 // 实现线程优先级比较函数
 bool thread_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux)
 {

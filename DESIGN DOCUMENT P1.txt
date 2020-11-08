@@ -39,16 +39,35 @@ FirstName LastName <email@domain.example>
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+在对timer_sleep()的一次调用中：
+1.首先判断输入ticks是否为正，是否不处于外中断状态，是否可以进行中断，满足条件则继续，否则退出或者报错
+2.获取当前中断状态并禁止中断，进行一个原子操作
+3.获取当前进程，并在使输入的ticks与进程的阻塞时间blocked_time相加得到新的阻塞时间
+4.阻塞当前进程
+5.恢复中断状态为可中断
+
+在时钟中断处理（timer interrupt handler）中：
+1.获取当前中断状态并禁止中断，进行一个原子操作
+2.使得ticks加1，进行时间上的计数增加
+3.对每个线程调用blocked_time_check()函数，检测线程的阻塞时间（阻塞时间检测函数）
+4.在阻塞时间检测函数中，若线程不是阻塞状态，直接返回；若线程阻塞时间属性为0，直接返回；
+		大于0时，减1，如果恰好为0，则直接唤醒线程加入等待队列，否则返回
+5.对所有线程调用完阻塞时间检测函数之后，恢复中断状态为可中断，结束原子操作
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+对于每个线程，首先进行
+/*准备对函数进行更改*/
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
+我们在调用timer_sleep()时，函数内部禁止了中断，实际上是进行一个原子操作。
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+调用timer_sleep()时，函数内部禁止了中断，不可能响应时钟中断。
 
 ---- RATIONALE ----
 
@@ -80,7 +99,7 @@ struct thread
 	uint8_t *stack;                     /* Saved stack pointer. */
 	int priority;                       /* Priority. */
 	struct list_elem allelem;           /* List element for all threads list. */
-	int64_t blocked_time;           /*Time to be blocked. Designed for Project 1 Part 1 */ 
+	int64_t blocked_time;           /* 线程等待时间 */ 
 	int base_priority;              /* 线程原本的优先级 */
 	struct list locks;              /* 线程拥有的锁 */
 	struct lock *lock_waiting;      /* 正在等待的锁 */
