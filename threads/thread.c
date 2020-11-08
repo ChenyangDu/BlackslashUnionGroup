@@ -352,31 +352,6 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* 模仿thread_for_each创造相应的对每个睡眠队列进行操作 */
-void sleeping_thread_foreach (thread_action_func *func, void *aux)
-{
-  struct list_elem *e;
-  struct thread *t_prev;
-
-  ASSERT (intr_get_level () == INTR_OFF);
-
-  for (e = list_begin (&sleeping_list); e != list_end (&sleeping_list);
-       e = list_next (e))
-    {
-      if(t_prev!=NULL&&t_prev->blocked_time==0)
-      {
-        list_remove(&t_prev->elem);
-      }
-      struct thread *t = list_entry (e, struct thread, elem);
-      func (t, aux);
-      t_prev=t;
-    }
-    if(t_prev!=NULL&&t_prev->blocked_time==0)
-    {
-      list_remove(&t_prev->elem);
-    }
-}
-
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority(int new_priority)
@@ -654,20 +629,35 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 //阻塞时间检测
 void 
-blocked_time_check(struct thread *th, void *aux)
+blocked_time_check()
 {
-    if(th->status!=THREAD_BLOCKED)
-      return;
-    if(th->blocked_time>0)
-    {
-      th->blocked_time--;
-      if (th->blocked_time==0)
-      {
-        thread_unblock(th);
-      }
-      return;
-    }
+  struct list_elem *elem_cur; 
+  struct list_elem *elem_next; 
+  struct thread *t;
+  enum intr_level old_level;
+
+  if (list_empty (&sleeping_list))
     return;
+
+  elem_cur = list_begin (&sleeping_list);
+  while (elem_cur != list_end (&sleeping_list))
+    {
+      elem_next = list_next (elem_cur);
+      t = list_entry (elem_cur, struct thread, elem);
+      if (t->blocked_time > 1)
+      {
+        t->blocked_time-=1;
+        break;
+      }
+      t->blocked_time=0;
+      /* 从睡眠队列中删除线程并解锁线程 */
+      old_level = intr_disable ();
+      list_remove (elem_cur);
+      thread_unblock (t);
+      intr_set_level (old_level);
+
+      elem_cur = elem_next;
+    }
 }
 
 //插入睡眠队列
