@@ -115,8 +115,8 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-void blocked_time_check(); /* 阻塞时间检测函数 */
-void sleeping_list_insert(struct thread *th); /* 睡眠队列插入 */
+void blocked_time_check (void); /* 阻塞时间检测函数 */
+void sleeping_list_insert (int64_t); /* 睡眠队列插入 */
 
 void thread_init (void);
 void thread_start (void);

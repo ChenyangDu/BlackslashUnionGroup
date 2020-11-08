@@ -662,9 +662,12 @@ blocked_time_check()
 
 //插入睡眠队列
 void 
-sleeping_list_insert(struct thread *th) 
+sleeping_list_insert(int16_t ticks) 
 {
-  list_push_back(&sleeping_list,&th->elem);
+  struct thread *cur = thread_current();
+  list_push_back(&sleeping_list,&cur->elem);
+  cur->blocked_time=ticks;
+  thread_block ();
 }
 
 
