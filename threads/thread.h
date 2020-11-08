@@ -116,7 +116,6 @@ struct thread
 extern bool thread_mlfqs;
 
 void blocked_time_check(struct thread *th, void *aux); /* 阻塞时间检测函数 */
-void sleeping_thread_foreach (thread_action_func *func, void *aux); /* 睡眠队列函数调用函数 */
 void sleeping_list_insert(struct thread *th); /* 睡眠队列插入 */
 
 void thread_init (void);
@@ -141,6 +140,7 @@ void thread_yield (void);
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
+void sleeping_thread_foreach (thread_action_func *func, void *aux); /* 睡眠队列函数调用函数 */
 
 int thread_get_priority (void);
 void thread_set_priority (int);
