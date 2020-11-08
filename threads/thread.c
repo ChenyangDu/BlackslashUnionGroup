@@ -644,25 +644,22 @@ blocked_time_check()
     {
       elem_next = list_next (elem_cur);
       t = list_entry (elem_cur, struct thread, elem);
-      if (t->blocked_time > 1)
+      t->blocked_time-=1;
+      if (t->blocked_time == 0)
       {
-        t->blocked_time-=1;
-        break;
+        list_remove (elem_cur);
+        thread_unblock (t);
       }
-      t->blocked_time=0;
       /* 从睡眠队列中删除线程并解锁线程 */
       old_level = intr_disable ();
-      list_remove (elem_cur);
-      thread_unblock (t);
       intr_set_level (old_level);
-
       elem_cur = elem_next;
     }
 }
 
 //插入睡眠队列
 void 
-sleeping_list_insert(int16_t ticks) 
+sleeping_list_insert(int64_t ticks) 
 {
   struct thread *cur = thread_current();
   list_push_back(&sleeping_list,&cur->elem);
