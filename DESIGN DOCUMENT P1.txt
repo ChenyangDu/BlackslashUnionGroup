@@ -34,6 +34,10 @@ FirstName LastName <email@domain.example>
 	/*被原有函数timer_sleep(),thread_create()和新建函数blocked_time_check所引用*/
 	int64_t blocked_time /*用于记录所设置的阻塞时间*/
 
+添加静态队列list
+	/* 用于存储Mission 1中的睡眠队列，提高效率 */
+	static struct list sleeping_list; /* 存储睡眠队列 */
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
@@ -42,28 +46,31 @@ FirstName LastName <email@domain.example>
 在对timer_sleep()的一次调用中：
 1.首先判断输入ticks是否为正，是否不处于外中断状态，是否可以进行中断，满足条件则继续，否则退出或者报错
 2.获取当前中断状态并禁止中断，进行一个原子操作
-3.获取当前进程，并在使输入的ticks与进程的阻塞时间blocked_time相加得到新的阻塞时间
-4.阻塞当前进程
-5.恢复中断状态为可中断
+3.调用函数sleeping_list_insert ()（睡眠队列插入），ticks作为参数导入
+4.在上述函数中首先获取当前进程，之后将当前进程插入睡眠队列，并将当前进程的blocked_time设为ticks
+5.阻塞当前进程，返回timer_sleep()
+6.恢复中断状态，结束原子操作
 
 在时钟中断处理（timer interrupt handler）中：
-1.获取当前中断状态并禁止中断，进行一个原子操作
-2.使得ticks加1，进行时间上的计数增加
-3.对每个线程调用blocked_time_check()函数，检测线程的阻塞时间（阻塞时间检测函数）
-4.在阻塞时间检测函数中，若线程不是阻塞状态，直接返回；若线程阻塞时间属性为0，直接返回；
-		大于0时，减1，如果恰好为0，则直接唤醒线程加入等待队列，否则返回
-5.对所有线程调用完阻塞时间检测函数之后，恢复中断状态为可中断，结束原子操作
+1.使得ticks加1，进行时间上的计数增加
+2.调用blocked_time_check()函数，检测睡眠队列中的线程的阻塞时间（阻塞时间检测函数）
+4.在阻塞时间检测函数中，对于睡眠队列中的每一个线程，先禁止中断，之后查看其blocked_time阻塞时间，并将其减1
+5.如果blocked_time阻塞时间恰好为0，则直接唤醒线程加入等待队列，并将线程从睡眠队列中删除
+6.如果blocked_time阻塞时间不为0，则准备进入下一个线程
+7.每一个线程检测完之后，都恢复中断状态，结束原子操作
+6.检测完所有睡眠队列中的线程之后，返回时钟中断处理函数
 
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
-对于每个线程，首先进行
-/*准备对函数进行更改*/
+1）我们设了一个睡眠线程队列，在设置阻塞时间时，将当前线程直接加入到睡眠线程队列，以便于在处理
+睡眠线程时只需要在睡眠线程队列中进行处理即可
+2）对于每个blocked_time==0的睡眠线程，在唤醒其之后，直接将其从睡眠队列中删除，防止二次检测拖慢时间
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
-我们在调用timer_sleep()时，函数内部禁止了中断，实际上是进行一个原子操作。
+我们在调用timer_sleep()时，函数内部禁止了中断，实际上是进行一个原子操作。因此不可能被同时占用。
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
@@ -73,6 +80,11 @@ FirstName LastName <email@domain.example>
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+初次选择时，我们实际上选择的时thread_foreach()函数对所有线程进行扫描，在之后的思考中，我们发现
+这种方法虽然是可行的但是会有很多冗余线程被扫描，尽管他们并未睡眠，因此，我们模仿all_list，参考
+thread_foreach()函数，在设置ticks时，就将当前线程加入到一个单独的队列sleeping_list之中，在扫
+描时，也只扫描这个睡眠线程队列，极大减少了冗余线程被扫描的情况，提高了系统效率。并且这种设计可以
+让我们在出现bug时，只需要考虑sleeping_list相关的函数即可，提高了可维护性和安全性
 
 			 PRIORITY SCHEDULING
 			 ===================
