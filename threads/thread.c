@@ -672,7 +672,14 @@ sleeping_list_insert(int64_t ticks)
 // 实现线程优先级比较函数
 bool thread_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
-  return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
+  struct thread *thread_a, *thread_b;
+  thread_a = list_entry(a, struct thread, elem);
+  thread_b = list_entry(b, struct thread, elem);
+  if(thread_a->priority != thread_b->priority)
+    return thread_a->priority > thread_b->priority;
+  else if(thread_a->recent_cpu != thread_b->recent_cpu)
+    return thread_a->recent_cpu < thread_b->recent_cpu;
+  return thread_a->nice > thread_b->nice;
 }
 
 // /* 让线程获得锁 */
