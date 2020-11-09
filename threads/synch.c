@@ -215,26 +215,27 @@ void lock_acquire(struct lock *lock)
     while (lock_now && current_thread->priority > lock_now->max_priority)
     {
       lock_now->max_priority = current_thread->priority; /* 修改锁的最大优先级 */
-      thread_donate_priority(lock_now->holder);
+      // thread_donate_priority(lock_now->holder);
+      lock_now_holder = lock_now->holder;
       // 优先级捐赠：
       // 原子操作
-      // enum intr_level old_level = intr_disable();
-      // // 更新优先级
-      // // todo:thread_update_priority (lock_now->holder);
-      // thread_update_priority (lock_now_holder);
-      // // 
-      // if (lock_now_holder->status == THREAD_READY)
-      // {
-      //   // 改为排序？
-      //   list_remove(&lock_now_holder->elem);
-      //   list_insert_ordered(&ready_list, &lock_now_holder->elem, thread_pr_cmp, NULL);
-      // }
-      // intr_set_level (old_level);
+      old_level1 = intr_disable();
+      // 更新优先级
+      // todo:thread_update_priority (lock_now->holder);
+      thread_update_priority (lock_now_holder);
+      // 
+      if (lock_now_holder->status == THREAD_READY)
+      {
+        // 改为排序？
+        list_remove(&lock_now_holder->elem);
+        list_insert_ordered(thread_get_ready_list(), &lock_now_holder->elem, thread_pr_cmp, NULL);
+      }
+      intr_set_level (old_level1);
       // 优先级捐赠结束
 
       // 更新当前判断的锁
-      lock_now = lock_now->holder->lock_waiting; /* l变为其拥有者的等待的锁 */
-      lock_now_holder = lock_now->holder;
+      lock_now = lock_now_holder->lock_waiting; /* l变为其拥有者的等待的锁 */
+      // lock_now_holder = lock_now->holder;
     }
   }
 

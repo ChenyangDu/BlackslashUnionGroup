@@ -682,6 +682,11 @@ bool thread_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *
   return thread_a->nice > thread_b->nice;
 }
 
+// 返回准备列表
+struct list *thread_get_ready_list(void){
+  return &ready_list;
+}
+
 // /* 让线程获得锁 */
 // void thread_hold_the_lock(struct lock *lock)
 // {
@@ -707,7 +712,7 @@ void thread_donate_priority(struct thread *t)
   if (t->status == THREAD_READY)
   {
     list_remove(&t->elem);
-    list_insert_ordered(&ready_list, &t->elem, thread_pr_cmp, NULL);
+    list_insert_ordered(thread_get_ready_list(), &t->elem, thread_pr_cmp, NULL);
   }
   intr_set_level(old_level);
 }
