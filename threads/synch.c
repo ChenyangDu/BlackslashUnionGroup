@@ -219,7 +219,7 @@ void lock_acquire(struct lock *lock)
       lock_now_holder = lock_now->holder;
       // 优先级捐赠：
       // 原子操作
-      old_level1 = intr_disable();
+      // old_level1 = intr_disable();
       // 更新优先级
       // todo:thread_update_priority (lock_now->holder);
       thread_update_priority (lock_now_holder);
@@ -230,7 +230,7 @@ void lock_acquire(struct lock *lock)
         list_remove(&lock_now_holder->elem);
         list_insert_ordered(thread_get_ready_list(), &lock_now_holder->elem, thread_pr_cmp, NULL);
       }
-      intr_set_level (old_level1);
+      // intr_set_level (old_level1);
       // 优先级捐赠结束
 
       // 更新当前判断的锁
