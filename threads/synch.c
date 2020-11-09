@@ -207,7 +207,6 @@ void lock_acquire(struct lock *lock)
   {
     current_thread->lock_waiting = lock; /* 当前线程正在等待这个锁 */
     lock_now = lock;
-    lock_now_holder = lock_now->holder;
     // 当前线程的优先级 > 锁的最大优先级
     // 循环优先级捐赠：
     while (lock_now && current_thread->priority > lock_now->max_priority)
@@ -217,18 +216,14 @@ void lock_acquire(struct lock *lock)
       lock_now_holder = lock_now->holder;
       // 优先级捐赠：
       // 更新优先级
-      if (!list_empty(&lock_now_holder->lock_list)) {
-        list_sort(&lock_now_holder->lock_list, lock_cmp_priority, NULL);
-        int tmp = list_entry(list_front(&lock_now_holder->lock_list), struct lock, elem)->max_priority;
-        lock_now_holder->priority = tmp>lock_now_holder->original_priority?tmp:lock_now_holder->original_priority;
-      } else
-        lock_now_holder->priority = lock_now_holder->original_priority;
+      list_sort(&lock_now_holder->lock_list, lock_cmp_priority, NULL);
+      int tmp = list_entry(list_front(&lock_now_holder->lock_list), struct lock, elem)->max_priority;
+      lock_now_holder->priority = tmp>lock_now_holder->original_priority?tmp:lock_now_holder->original_priority;
       //
       if (lock_now_holder->status == THREAD_READY)
       {
-        // 改为排序？
-        list_remove(&lock_now_holder->elem);
-        list_insert_ordered(thread_get_ready_list(), &lock_now_holder->elem, thread_pr_cmp, NULL);
+        // 更新等待队列的顺序
+        list_sort(thread_get_ready_list(),  thread_pr_cmp, NULL);
       }
       // 优先级捐赠结束
 
@@ -301,7 +296,7 @@ void lock_release(struct lock *lock)
     t = thread_current();
     // 更新优先级
     if (!list_empty(&t->lock_list)) {
-      list_sort(&t->lock_list, lock_cmp_priority, NULL);
+      // 等待队列为优先队列，删除某个元素不改变顺序
       int tmp = list_entry(list_front(&t->lock_list), struct lock, elem)->max_priority;
       t->priority = tmp>t->original_priority?tmp:t->original_priority;
     } else
