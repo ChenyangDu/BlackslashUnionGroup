@@ -687,64 +687,6 @@ struct list *thread_get_ready_list(void){
   return &ready_list;
 }
 
-// /* 让线程获得锁 */
-// void thread_hold_the_lock(struct lock *lock)
-// {
-//   enum intr_level old_level = intr_disable(); /* 原子操作 */
-//   // 当前线程拥有的锁队列里面插入lock
-//   list_insert_ordered(&thread_current()->locks, &lock->elem, thread_pr_cmp, NULL);
-
-//   // 更新锁的最大优先级
-//   if (lock->max_prioroty > thread_current()->priority)
-//   {
-//     thread_current()->priority = lock->max_prioroty;
-//     thread_yield();
-//   }
-
-//   intr_set_level(old_level); /* 原子操作结束 */
-// }
-
-/* 将当前的优先级捐赠给线程T */
-void thread_donate_priority(struct thread *t)
-{
-  enum intr_level old_level = intr_disable();
-  thread_update_priority(t);
-  if (t->status == THREAD_READY)
-  {
-    list_remove(&t->elem);
-    list_insert_ordered(thread_get_ready_list(), &t->elem, thread_pr_cmp, NULL);
-  }
-  intr_set_level(old_level);
-}
-// /* 移除锁 */
-// void
-// thread_remove_lock (struct lock *lock)
-// {
-//   enum intr_level old_level = intr_disable ();
-//   list_remove (&lock->elem);
-//   thread_update_priority (thread_current ());
-//   intr_set_level (old_level);
-// }
-/* 更新线程的优先级 */
-void 
-thread_update_priority(struct thread *t)
-{
-  enum intr_level old_level = intr_disable();
-  int max_priority = t->original_priority;
-  int lock_priority;
-
-  if(!list_empty(&t->lock_list))
-  {
-    list_sort(&t->lock_list,lock_cmp_priority,NULL); /* 将线程拥有的锁按优先级排序 */
-    /* 第一个锁的优先级是优先级最大的 */
-    lock_priority = list_entry(list_front(&t->lock_list),struct lock,elem)->max_priority;
-    if(lock_priority > max_priority)
-      max_priority = lock_priority;
-  }
-  t->priority = max_priority;
-  // printf("%d %d\n",max_priority, t->priority);
-  intr_set_level(old_level);
-}
 /* 当前线程的CPU+1 */
 void
 thread_mlfqs_increase_recent_cpu_by_one (void)

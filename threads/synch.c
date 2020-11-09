@@ -69,8 +69,6 @@ void sema_down(struct semaphore *sema)
   {
     // 唤醒时排序，此处不需要按优先级插入
     list_push_back(&sema->waiters, &thread_current()->elem);
-    /* 改为按优先级插入 */
-    // list_insert_ordered(&sema->waiters, &thread_current()->elem,thread_pr_cmp,NULL);
     thread_block();
   }
   sema->value--;
@@ -202,7 +200,7 @@ void lock_acquire(struct lock *lock)
   struct thread *current_thread = thread_current();
   struct lock *lock_now;
   struct thread *lock_now_holder;
-  enum intr_level old_level, old_level1;
+  enum intr_level old_level;
 
   // 如果当前的锁被其他线程拥有
   if (lock->holder != NULL && !thread_mlfqs)
@@ -218,24 +216,24 @@ void lock_acquire(struct lock *lock)
       // thread_donate_priority(lock_now->holder);
       lock_now_holder = lock_now->holder;
       // 优先级捐赠：
-      // 原子操作
-      // old_level1 = intr_disable();
       // 更新优先级
-      // todo:thread_update_priority (lock_now->holder);
-      thread_update_priority (lock_now_holder);
-      // 
+      if (!list_empty(&lock_now_holder->lock_list)) {
+        list_sort(&lock_now_holder->lock_list, lock_cmp_priority, NULL);
+        int tmp = list_entry(list_front(&lock_now_holder->lock_list), struct lock, elem)->max_priority;
+        lock_now_holder->priority = tmp>lock_now_holder->original_priority?tmp:lock_now_holder->original_priority;
+      } else
+        lock_now_holder->priority = lock_now_holder->original_priority;
+      //
       if (lock_now_holder->status == THREAD_READY)
       {
         // 改为排序？
         list_remove(&lock_now_holder->elem);
         list_insert_ordered(thread_get_ready_list(), &lock_now_holder->elem, thread_pr_cmp, NULL);
       }
-      // intr_set_level (old_level1);
       // 优先级捐赠结束
 
       // 更新当前判断的锁
       lock_now = lock_now_holder->lock_waiting; /* l变为其拥有者的等待的锁 */
-      // lock_now_holder = lock_now->holder;
     }
   }
 
@@ -249,9 +247,7 @@ void lock_acquire(struct lock *lock)
     current_thread->lock_waiting = NULL;
     lock->max_priority = current_thread->priority;
     // 线程获得锁
-    // thread_hold_the_lock(lock);
     // 维护线程锁的优先队列
-    // old_level1 = intr_disable();
     list_insert_ordered(&current_thread->lock_list, &lock->elem, lock_cmp_priority, NULL);
     if (lock->max_priority > current_thread->priority)
     {
@@ -259,9 +255,7 @@ void lock_acquire(struct lock *lock)
       current_thread->priority = lock->max_priority;
       // 抢占式调度，重新选择当前线程
       thread_yield();
-    }
-    // intr_set_level(old_level1);
-    
+    }   
   }
   lock->holder = thread_current();
 
@@ -295,16 +289,23 @@ bool lock_try_acquire(struct lock *lock)
 void lock_release(struct lock *lock)
 {
   enum intr_level old_level;
+  struct thread *t;
 
   ASSERT(lock != NULL);
   ASSERT(lock_held_by_current_thread(lock));
 
   old_level = intr_disable ();
-  // if(!thread_mlfqs)
-  //   thread_remove_lock(lock);
+  // 将锁从线程的锁列表中删除
   if(!thread_mlfqs){
     list_remove(&lock->elem);
-    thread_update_priority(thread_current());
+    t = thread_current();
+    // 更新优先级
+    if (!list_empty(&t->lock_list)) {
+      list_sort(&t->lock_list, lock_cmp_priority, NULL);
+      int tmp = list_entry(list_front(&t->lock_list), struct lock, elem)->max_priority;
+      t->priority = tmp>t->original_priority?tmp:t->original_priority;
+    } else
+      t->priority = t->original_priority;
   }
 
   lock->holder = NULL;
@@ -393,7 +394,7 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
   if (!list_empty(&cond->waiters))
   {
     /* 排序 */
-    list_sort(&cond->waiters,cond_sema_cmp_priority,NULL);
+    list_sort(&cond->waiters,cond_pr_cmp,NULL);
     sema_up(&list_entry(list_pop_front(&cond->waiters),
                         struct semaphore_elem, elem)
                  ->semaphore);
@@ -423,7 +424,7 @@ bool lock_cmp_priority (const struct list_elem *a, const struct list_elem *b, vo
 }
 /* cond比较函数 */
 bool
-cond_sema_cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+cond_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
   struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
