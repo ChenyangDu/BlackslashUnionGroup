@@ -737,26 +737,13 @@ thread_update_priority(struct thread *t)
       max_priority = lock_priority;
   }
   t->priority = max_priority;
-  // printf("%d %d\n",max_priority, t->priority);
+  
   intr_set_level(old_level);
-}
-/* 当前线程的CPU+1 */
-void
-thread_mlfqs_increase_recent_cpu_by_one (void)
-{
-  ASSERT (thread_mlfqs);
-  ASSERT (intr_context ());
-
-  struct thread *current_thread = thread_current ();
-  if (current_thread == idle_thread)
-    return;
-  current_thread->recent_cpu = F_ADD (current_thread->recent_cpu,INT_TO_FIXED(1));
 }
 /* 更新load_avg和recent_cpu */
 void
 thread_mlfqs_update_load_avg_and_recent_cpu (void)
 {
-  ASSERT (thread_mlfqs);
   ASSERT (intr_context ());
 
   size_t ready_threads = list_size (&ready_list);
@@ -764,8 +751,7 @@ thread_mlfqs_update_load_avg_and_recent_cpu (void)
     ready_threads++;
   load_avg = F_DIV(F_MUL(INT_TO_FIXED(59),load_avg),INT_TO_FIXED(60));
   load_avg = F_ADD(load_avg,F_DIV(INT_TO_FIXED(ready_threads),INT_TO_FIXED(60)));
-  //load_avg = FP_ADD (FP_DIV_MIX (FP_MULT_MIX (load_avg, 59), 60), FP_DIV_MIX (FP_CONST (ready_threads), 60));
-
+  
   struct thread *t;
   struct list_elem *e = list_begin (&all_list);
   for (; e != list_end (&all_list); e = list_next (e))
@@ -778,17 +764,13 @@ thread_mlfqs_update_load_avg_and_recent_cpu (void)
     }
   }
 }
-/* Update priority. */
+/* 更新 priority. */
 void
 thread_mlfqs_update_priority (struct thread *t)
 {
-  if (t == idle_thread)
-    return;
-
-  ASSERT (thread_mlfqs);
-  ASSERT (t != idle_thread);
-
   t->priority = FIXED_TO_INT_ZERO (F_SUB (F_SUB (INT_TO_FIXED (PRI_MAX), F_DIV (t->recent_cpu, INT_TO_FIXED(4))), INT_TO_FIXED(2 * t->nice)));
-  t->priority = t->priority < PRI_MIN ? PRI_MIN : t->priority;
-  t->priority = t->priority > PRI_MAX ? PRI_MAX : t->priority;
+  if (t->priority < PRI_MIN)
+    t->priority = PRI_MIN;
+  else if(t->priority > PRI_MAX)
+    t->priority = PRI_MAX;
 }
