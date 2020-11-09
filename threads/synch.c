@@ -31,6 +31,7 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+// #include "threads/thread.c"
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -66,8 +67,10 @@ void sema_down(struct semaphore *sema)
   old_level = intr_disable();
   while (sema->value == 0)
   {
+    // 唤醒时排序，此处不需要按优先级插入
+    list_push_back(&sema->waiters, &thread_current()->elem);
     /* 改为按优先级插入 */
-    list_insert_ordered(&sema->waiters, &thread_current()->elem,thread_pr_cmp,NULL);
+    // list_insert_ordered(&sema->waiters, &thread_current()->elem,thread_pr_cmp,NULL);
     thread_block();
   }
   sema->value--;
@@ -191,26 +194,47 @@ void lock_init(struct lock *lock)
    we need to sleep. */
 void lock_acquire(struct lock *lock)
 {
-  // 当前线程的指针
-  struct thread *current_thread = thread_current();
-  struct lock *l;
-  enum intr_level old_level;
-
   ASSERT(lock != NULL);
   ASSERT(!intr_context());
   ASSERT(!lock_held_by_current_thread(lock));
+
+    // 当前线程的指针
+  struct thread *current_thread = thread_current();
+  struct lock *lock_now;
+  struct thread *lock_now_holder;
+  enum intr_level old_level, old_level1;
 
   // 如果当前的锁被其他线程拥有
   if (lock->holder != NULL && !thread_mlfqs)
   {
     current_thread->lock_waiting = lock; /* 当前线程正在等待这个锁 */
-    l = lock;
+    lock_now = lock;
+    lock_now_holder = lock_now->holder;
     // 当前线程的优先级 > 锁的最大优先级
-    while (l && current_thread->priority > l->max_prioroty)
+    // 循环优先级捐赠：
+    while (lock_now && current_thread->priority > lock_now->max_priority)
     {
-      l->max_prioroty = current_thread->priority; /* 修改锁的最大优先级 */
-      thread_donate_priority(l->holder);
-      l = l->holder->lock_waiting; /* l变为其拥有者的等待的锁 */
+      lock_now->max_priority = current_thread->priority; /* 修改锁的最大优先级 */
+      thread_donate_priority(lock_now->holder);
+      // 优先级捐赠：
+      // 原子操作
+      // enum intr_level old_level = intr_disable();
+      // // 更新优先级
+      // // todo:thread_update_priority (lock_now->holder);
+      // thread_update_priority (lock_now_holder);
+      // // 
+      // if (lock_now_holder->status == THREAD_READY)
+      // {
+      //   // 改为排序？
+      //   list_remove(&lock_now_holder->elem);
+      //   list_insert_ordered(&ready_list, &lock_now_holder->elem, thread_pr_cmp, NULL);
+      // }
+      // intr_set_level (old_level);
+      // 优先级捐赠结束
+
+      // 更新当前判断的锁
+      lock_now = lock_now->holder->lock_waiting; /* l变为其拥有者的等待的锁 */
+      lock_now_holder = lock_now->holder;
     }
   }
 
@@ -222,8 +246,21 @@ void lock_acquire(struct lock *lock)
   if (!thread_mlfqs)
   {
     current_thread->lock_waiting = NULL;
-    lock->max_prioroty = current_thread->priority;
-    thread_hold_the_lock(lock);
+    lock->max_priority = current_thread->priority;
+    // 线程获得锁
+    // thread_hold_the_lock(lock);
+    // 维护线程锁的优先队列
+    // old_level1 = intr_disable();
+    list_insert_ordered(&current_thread->lock_list, &lock->elem, lock_cmp_priority, NULL);
+    if (lock->max_priority > current_thread->priority)
+    {
+      // 更新当前线程优先度
+      current_thread->priority = lock->max_priority;
+      // 抢占式调度，重新选择当前线程
+      thread_yield();
+    }
+    // intr_set_level(old_level1);
+    
   }
   lock->holder = thread_current();
 
@@ -262,8 +299,12 @@ void lock_release(struct lock *lock)
   ASSERT(lock_held_by_current_thread(lock));
 
   old_level = intr_disable ();
-  if(!thread_mlfqs)
-    thread_remove_lock(lock);
+  // if(!thread_mlfqs)
+  //   thread_remove_lock(lock);
+  if(!thread_mlfqs){
+    list_remove(&lock->elem);
+    thread_update_priority(thread_current());
+  }
 
   lock->holder = NULL;
   sema_up(&lock->semaphore);
@@ -377,7 +418,7 @@ void cond_broadcast(struct condition *cond, struct lock *lock)
 // 比较锁的优先级
 bool lock_cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
-  return list_entry(a,struct lock,elem)->max_prioroty > list_entry(b,struct lock,elem)->max_prioroty;
+  return list_entry(a,struct lock,elem)->max_priority > list_entry(b,struct lock,elem)->max_priority;
 }
 /* cond比较函数 */
 bool
