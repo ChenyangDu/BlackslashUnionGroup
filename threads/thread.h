@@ -145,12 +145,16 @@ int thread_get_priority (void);
 void thread_set_priority (int);
 // 新建了比较线程优先级的函数
 bool thread_pr_cmp (const struct list_elem *, const struct list_elem *, void *);
+
+// 返回准备列表
+struct list *thread_get_ready_list(void);
 // /* 让线程获得锁 */
 // void thread_hold_the_lock(struct lock *);
 /* 将当前的优先级捐赠给线程T */
-void thread_donate_priority(struct thread *);
+// void thread_donate_priority(struct thread *);
 // void thread_remove_lock (struct lock *);
-void thread_update_priority (struct thread *);
+// void thread_pr_update (struct thread *);
+// void thread_mlfqs_increase_recent_cpu_by_one (void);
 void thread_mlfqs_update_priority (struct thread *);
 void thread_mlfqs_update_load_avg_and_recent_cpu (void);
 
