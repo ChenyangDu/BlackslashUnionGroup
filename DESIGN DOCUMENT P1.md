@@ -95,58 +95,52 @@
 ##### B1: Copy here the declaration of each new or changed `struct` or `struct` member, global or static variable, `typedef`, or enumeration.  Identify the purpose of each in 25 words or less.
 
 ```c
-struct lock 
-{
-	struct thread *holder;      /* Thread holding lock (for debugging). */
-	struct semaphore semaphore; /* Binary semaphore controlling access. */
+添加到结构体 struct lock 中：
 	struct list_elem elem;      /* 用来构成链表 */
 	int max_prioroty;           /* 拥有该锁的所有线程里面最高的优先级 */
-};
-struct thread
-	{
-	/* Owned by thread.c. */
-	tid_t tid;                      /* Thread identifier. */
-	enum thread_status status;      /* Thread state. */
-	char name[16];                  /* Name (for debugging purposes). */
-	uint8_t *stack;                 /* Saved stack pointer. */
-	int priority;                   /* Priority. */
-	struct list_elem allelem;       /* List element for all threads list. */
+
+添加到结构体 struct thread 中：
 	int64_t blocked_time;           /* 线程等待时间 */ 
-	int base_priority;              /* 线程原本的优先级 */
-	struct list locks;              /* 线程拥有的锁 */
+	int original_priority;              /* 线程原本的优先级 */
+	struct list lock_list;              /* 线程拥有的锁 */
 	struct lock *lock_waiting;      /* 正在等待的锁 */
-
-	/* Shared between thread.c and synch.c. */
-	struct list_elem elem;              /* List element. */
-#ifdef USERPROG
-	/* Owned by userprog/process.c. */
-	uint32_t *pagedir;                  /* Page directory. */
-#endif
-	/* Owned by thread.c. */
-	unsigned magic;                     /* Detects stack overflow. */
-};
-
 ```
 
 ##### B2: Explain the data structure used to track priority donation. Use ASCII art to diagram a nested donation.  (Alternately, submit a .png file.)
+在锁的结构体中添加锁当前的持有线程，在任意线程获得锁的时候，检查当前的锁，如果当前锁的最大优先级小于当前线程的优先级，则将当前锁的最大优先级更新，然后取得当前锁的持有线程（当前锁未被当前线程获取），如果该线程此时被其他锁阻塞，则将当前检查的锁更新为阻塞该线程的锁，继续检查，直到确保所有相关锁的最大优先级不小于当前线程的优先级。在每次检查的过程中，随着锁优先级的更新，也要对持有该锁的线程中的锁队列进行排序，确保线程中锁队列是一个优先队列，并且将线程的优先级保持为队列第一个锁的最大优先级（如果自身的初始优先级更大则保持自身优先级）。
 
 ### ALGORITHMS
 
 ##### B3: How do you ensure that the highest priority thread waiting for a lock, semaphore, or condition variable wakes up first?
 
-维护信号量，锁的等待队列和condition的waiters队列为优先队列
+1. 对于信号量，在执行信号量的up操作时先进行等待队列的排序，再将线程unlock。
+2. 对于condition，在执行cond_dignal操作时，先对等待队列排序，再执行信号量up操作。
+3. 对于锁，每次获得锁后，先完成优先级捐赠，再对处在等待状态中的线程进行等待队列排序，确保唤醒的顺序是依据优先级的。
 
 ##### B4: Describe the sequence of events when a call to lock_acquire() causes a priority donation.  How is nested donation handled?
+1. 将当前线程等待的锁置为该锁。
+2. 进行优先级捐赠，确保所有相关的锁（即自身等待的锁被某线程持有，而某线程又在等待另一个被持有的锁，这样的锁都是相关的锁）的最大优先级高于当前线程的优先级，并维护其持有者的持有锁优先队列，更新其持有者的优先级，完成优先级的嵌套捐赠。
+3. 获取锁
+4. 当前线程的等待锁置空
+5. 锁的最大优先级更新为当前线程的优先级
+6. 维护线程持有的锁的优先队列
+7. 更新优先级，重新调度
+通过循环更新当前检查的锁为等待锁-持有锁链上的锁，确保此锁的最大优先级不小于当前线程的优先级，将所有等待锁-持有锁链上的线程的拥有锁队列维护为优先队列，将每个线程的优先级更新为持有锁的最大优先级。这样最后能提升所有没有当前线程优先级高，但持有相关锁的线程的优先级，完成优先级的嵌套捐赠。
 
 ##### B5: Describe the sequence of events when lock_release() is called on a lock that a higher-priority thread is waiting for.
+1. 将该锁从该线程的拥有锁队列中删除
+2. 如果拥有锁队列不为空，因为拥有锁队列是优先队列，所以从拥有锁队列的头部取出下一个锁，更新当前线程的优先级为初始优先级和下一个锁的最大优先级二者中较大的那个。
+3. 释放锁结构体中的信号量。
+注：由于所有等待该锁的线程的优先级的最大值已经存储在拥有锁的最大优先级中，所以等待该锁的线程的优先级高低其实不会对当前线程释放锁的过程有影响，当前线程释放锁后，更新自己的优先级，再次调度的时候，根据更新后的优先级调度即可。
 
 ### SYNCHRONIZATION
 
 ##### B6: Describe a potential race in thread_set_priority() and explain how your implementation avoids it.  Can you use a lock to avoid this race?
-
+当新设置的优先级比被捐赠的优先级低的时候，会产生线程优先级的竞争。我们的解决方法是，设置了线程的原始优先级，更改优先级的操作先更改原始优先级，如果该优先级低于线程当前的优先级，则不做进一步处理，因为此时线程处于被捐赠的状态。如果高于线程当前的优先级，则更改当前优先级，并进行抢占式调度，按照新优先级更新就绪队列。不能用锁解决，锁的操作中也涉及到操作线程的优先级，可能会互相调用，造成死锁。
 ### RATIONALE
 
 ##### B7: Why did you choose this design?  In what ways is it superior to another design you considered?
+这个设计将线程的优先级的更新和捐赠实现为其拥有的锁按最大优先级维护的优先队列，不需要维护自身被捐赠的优先级队列，将优先级捐赠的逻辑实现为拥有锁的优先队列的维护，虽然逻辑比较复杂，但实现过程比较方便。
 
 <div STYLE="page-break-after: always;"></div>
 
