@@ -190,6 +190,19 @@ thread.c中加入全局变量
 ##### C3: Did any ambiguities in the scheduler specification make values in the table uncertain?  If so, what rule did you use to resolve them?  Does this match the behavior of your scheduler?
 
 在多个线程的优先级相同的时候，选择优先级最大的线程是不确定的。为了解决该问题，我们修改了线程优先级的比较函数，以优先级为第一关键字，线程的`recent_cpu`为第二关键字，线程的`nice`为第三关键字，如果两个线程的优先级、`recent_cpu`、`nice`都相同那么就随机选取一个线程。
+```c
+bool thread_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+  struct thread *thread_a, *thread_b;
+  thread_a = list_entry(a, struct thread, elem);
+  thread_b = list_entry(b, struct thread, elem);
+  if(thread_a->priority != thread_b->priority)
+    return thread_a->priority > thread_b->priority;
+  else if(thread_a->recent_cpu != thread_b->recent_cpu)
+    return thread_a->recent_cpu < thread_b->recent_cpu;
+  return thread_a->nice > thread_b->nice;
+}
+```
 
 ##### C4: How is the way you divided the cost of scheduling between code inside and outside interrupt context likely to affect performance?
 
@@ -202,8 +215,7 @@ thread.c中加入全局变量
 
 优点：
 
-1. 在原有系统的基础上只做了少量的修改，新添加的数据结构和变量较少，尽可能优化
-   原有系统。
+1. 在原有系统的基础上只做了少量的修改，新添加的数据结构和变量较少，尽可能优化原有系统。
 2. 浮点运算利用了系统原有的`int`类型，利用位运算等操作提升计算速度。
 
 缺点：

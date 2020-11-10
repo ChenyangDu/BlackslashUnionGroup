@@ -666,9 +666,6 @@ sleeping_list_insert(int64_t ticks)
   cur->blocked_time=ticks;
   thread_block ();
 }
-
-
-
 // 实现线程优先级比较函数
 bool thread_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
