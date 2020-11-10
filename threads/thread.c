@@ -666,7 +666,6 @@ sleeping_list_insert(int64_t ticks)
   cur->blocked_time=ticks;
   thread_block ();
 }
-
 // 实现线程优先级比较函数
 bool thread_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
@@ -689,7 +688,6 @@ struct list *thread_get_ready_list(void){
 void
 thread_mlfqs_update_load_avg_and_recent_cpu (void)
 {
-  ASSERT (thread_mlfqs);
   ASSERT (intr_context ());
 
   size_t ready_threads = list_size (&ready_list);
@@ -697,8 +695,7 @@ thread_mlfqs_update_load_avg_and_recent_cpu (void)
     ready_threads++;
   load_avg = F_DIV(F_MUL(INT_TO_FIXED(59),load_avg),INT_TO_FIXED(60));
   load_avg = F_ADD(load_avg,F_DIV(INT_TO_FIXED(ready_threads),INT_TO_FIXED(60)));
-  //load_avg = FP_ADD (FP_DIV_MIX (FP_MULT_MIX (load_avg, 59), 60), FP_DIV_MIX (FP_CONST (ready_threads), 60));
-
+  
   struct thread *t;
   struct list_elem *e = list_begin (&all_list);
   for (; e != list_end (&all_list); e = list_next (e))
@@ -711,17 +708,13 @@ thread_mlfqs_update_load_avg_and_recent_cpu (void)
     }
   }
 }
-/* Update priority. */
+/* 更新 priority. */
 void
 thread_mlfqs_update_priority (struct thread *t)
 {
-  if (t == idle_thread)
-    return;
-
-  ASSERT (thread_mlfqs);
-  ASSERT (t != idle_thread);
-
   t->priority = FIXED_TO_INT_ZERO (F_SUB (F_SUB (INT_TO_FIXED (PRI_MAX), F_DIV (t->recent_cpu, INT_TO_FIXED(4))), INT_TO_FIXED(2 * t->nice)));
-  t->priority = t->priority < PRI_MIN ? PRI_MIN : t->priority;
-  t->priority = t->priority > PRI_MAX ? PRI_MAX : t->priority;
+  if (t->priority < PRI_MIN)
+    t->priority = PRI_MIN;
+  else if(t->priority > PRI_MAX)
+    t->priority = PRI_MAX;
 }
