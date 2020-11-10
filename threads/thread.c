@@ -685,18 +685,6 @@ struct list *thread_get_ready_list(void){
   return &ready_list;
 }
 
-/* 当前线程的CPU+1 */
-void
-thread_mlfqs_increase_recent_cpu_by_one (void)
-{
-  ASSERT (thread_mlfqs);
-  ASSERT (intr_context ());
-
-  struct thread *current_thread = thread_current ();
-  if (current_thread == idle_thread)
-    return;
-  current_thread->recent_cpu = F_ADD (current_thread->recent_cpu,INT_TO_FIXED(1));
-}
 /* 更新load_avg和recent_cpu */
 void
 thread_mlfqs_update_load_avg_and_recent_cpu (void)
