@@ -16,10 +16,7 @@ tar xzf $SRCDIR/bochs-2.6.2.tar.gz
 cd bochs-2.6.2
 cat $PINTOSDIR/src/misc/bochs-2.6.2-jitter-plus-segv.patch | patch -p1
 cat $PINTOSDIR/src/misc/bochs-2.6.2-xrandr-pkgconfig.patch | patch -p1
-cat $PINTOSDIR/src/misc/bochs-2.6.2-banner-stderr.patch | patch -p1
-cat $PINTOSDIR/src/misc/bochs-2.6.2-block-device-check.patch | patch -p1
-cat $PINTOSDIR/src/misc/bochs-2.6.2-link-tinfo.patch | patch -p1
-CFGOPTS="--with-x --with-x11 --with-term --with-nogui --prefix=$DSTDIR"
+CFGOPTS="--with-x --with-x11 --with-term --with-nogui --prefix=$DSTDIR --enable-cpu-level=6"
 mkdir plain &&
         cd plain && 
         ../configure $CFGOPTS --enable-gdb-stub && 
@@ -28,7 +25,7 @@ mkdir plain &&
         cd ..
 mkdir with-dbg &&
         cd with-dbg &&
-        ../configure --enable-debugger --disable-debugger-gui $CFGOPTS &&
+        ../configure --enable-debugger $CFGOPTS &&
         make &&
         cp bochs $DSTDIR/bin/bochs-dbg &&
         cd ..
