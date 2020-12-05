@@ -74,9 +74,24 @@ start_process (void *file_name_)
   success = load (argument, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  palloc_free_page (file_name); // 没改呢，后来应该放到后面
+
+  // ++
+  struct thread *t = thread_current();
+
+  if (!success) {
+    // thread_exit ();
+
+    // ++...
+    palloc_free_page (file_name);
+    t->tid = -1;
+    sema_up(&t->SemaWaitSuccess);
+    ExitStatus(-1);
+  }
+  sema_up(&t->SemaWaitSuccess);
+
+  //todo: task4 
+    
 
   // 放参数
   char *esp = (char *)if_.esp;
