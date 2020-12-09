@@ -73,8 +73,6 @@ start_process (void *file_name_)
   argument = strtok_r(file_name, " ", &split_ptr);
   success = load (argument, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
-  palloc_free_page (file_name); // 没改呢，后来应该放到后面
 
   // ++
   struct thread *t = thread_current();
@@ -123,6 +121,8 @@ start_process (void *file_name_)
   esp = p + 1;
   // 指向新栈顶
   if_.esp = esp;
+
+   palloc_free_page (file_name); 
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

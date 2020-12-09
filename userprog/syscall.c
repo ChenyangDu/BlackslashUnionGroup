@@ -21,6 +21,13 @@
 // #define	STDOUT_FILENO	1
 #define stdin 1
 
+struct file_node
+{
+  int fd;
+  struct list_elem elem;
+  struct file *f;
+};
+
 
 static void syscall_handler (struct intr_frame *);
 // ++++++++
@@ -101,13 +108,14 @@ syscall_handler (struct intr_frame *f UNUSED)
 // ++++++++++++++++++++++++++++++++++
 void IWrite(struct intr_frame* f) // 三个参数
 {
-  int *esp = (int*)f->esp;
+  int *esp = (int *)f->esp;
   if (!is_user_vaddr(esp+7)) // ??应该是虚拟地址空间的判断
   {
     ExitStatus(-1);
   }
+  //可能会有问题
   int fd = *(esp+2); //文件句柄
-  char *buffer = (char*)*(esp+6); // 要输出输入缓冲
+  char *buffer = (char *)*(esp+6); // 要输出输入缓冲
   unsigned size = *(esp+3); // 输出内容大小
 
   if (fd == STDOUT_FILENO) // 标准输出设备
@@ -116,14 +124,14 @@ void IWrite(struct intr_frame* f) // 三个参数
     f->eax = 0;
   } else
   {
-    // struct thread *cur = thread_current();
-    // struct file_node *fn = GetFile(cur, fd); // 获取文件指针
-    // if (fn == NULL)
-    // {
-    //   f->eax = 0;
-    //   return;
-    // }
-    // f->eax = file_write(fn->f, buffer, size); // 写文件
+    struct thread *cur = thread_current();
+    struct file_node *fn = GetFile(cur, fd); // 获取文件指针
+    if (fn == NULL)
+    {
+      f->eax = 0;
+      return;
+    }
+    f->eax = file_write(fn->f, buffer, size); // 写文件
   }
   
   
@@ -213,5 +221,16 @@ void IHalt(struct intr_frame* f){
 }
 
 struct file_node *GetFile(struct thread *t, int fd){
+  struct list_elem *e;
+  for(e = list_begin(&t->file_list);e!=list_end(&t->file_list);e=list_next(e))
+  {
+    struct file_node *fn = list_entry (e, struct file_node, elem);
+    if(fn -> fd == fd)
+    {
+      return fn;
+    }
+    return NULL;
+    
+  }
 
 }

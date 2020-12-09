@@ -101,6 +101,9 @@ struct thread
 // #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    int FileNum;  /*打开文件数*/
+    struct list file_list; //打开文件列表
+    int maxfd; //句柄分配使用
 // #endif
 
     /* Owned by thread.c. */
