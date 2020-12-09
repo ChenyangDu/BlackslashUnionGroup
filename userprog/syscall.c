@@ -28,6 +28,13 @@ struct file_node
   struct file *f;
 };
 
+struct ret_data
+{
+  int pid;
+  int ret;
+  struct list_elem elem;
+}
+
 
 static void syscall_handler (struct intr_frame *);
 // ++++++++
@@ -36,7 +43,6 @@ CALL_PROC pfn[MAXCALL];
 
 void IWrite(struct intr_frame* f);
 void IExit(struct intr_frame* f);
-void ExitStatus(int status);
 void ICreate(struct intr_frame* f);
 void IOpen(struct intr_frame* f);
 void IClose(struct intr_frame* f);
@@ -49,6 +55,8 @@ void IRemove(struct intr_frame* f);
 void ITell(struct intr_frame* f);
 void IHalt(struct intr_frame* f);
 struct file_node *GetFile(struct thread *t, int fd);
+void ExitStatus(int status);
+int CloseFile(struct thread *t, int fd, int bAll);
 
 
 void
@@ -149,12 +157,6 @@ void IExit(struct intr_frame* f) // 一个参数，正常退出时调用
   thread_exit();
 }
 
-void ExitStatus(int status) // 非正常退出
-{
-  struct thread *cur = thread_current();
-  cur->ret = status;
-  thread_exit();
-}
 
 void ICreate(struct intr_frame* f){
 
@@ -234,3 +236,12 @@ struct file_node *GetFile(struct thread *t, int fd){
   }
 
 }
+
+void ExitStatus(int status) // 非正常退出
+{
+  struct thread *cur = thread_current();
+  cur->ret = status;
+  thread_exit();
+}
+
+int CloseFile(struct thread *t, int fd, int bAll)

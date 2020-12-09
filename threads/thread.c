@@ -468,6 +468,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+  sema_init (&t->SemaWaitSuccess, 0);
+
   t->ret = 0; // 返回值初始化为0
 
   old_level = intr_disable ();
