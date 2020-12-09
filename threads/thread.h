@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -102,12 +104,12 @@ struct thread
  //#ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    int FileNum;  /*打开文件数*/
+    int sons;
     struct list file_list; //打开文件列表
     struct list sons_ret; 
     bool bWait;
     bool SaveData;
-    int maxfd; //句柄分配使用
+    struct thread* father;
     struct semaphore* SemaWaitSuccess;
     struct semaphore* SemaWait;
     int ret;  // 保存返回值
@@ -155,6 +157,7 @@ int thread_get_load_avg (void);
 
 // ++++++++++++++++++++++++++
 void blocked_thread_check(struct thread *t, void *aux UNUSED);
+struct thread* GetThreadFromTid(tid_t id)；
 // ++++++++++++++++++++++++++
 
 #endif /* threads/thread.h */

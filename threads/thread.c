@@ -468,9 +468,16 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+//#ifdef USERPROG
   sema_init (&t->SemaWaitSuccess, 0);
-
+  sema_init (&t->SemaWait, 0);
   t->ret = 0; // 返回值初始化为0
+  t->SaveData = false;
+  t->bWait = false;
+  t->sons = 0;
+  list_init (&t->sons_ret);
+  list_init (&t->file_list);
+//#endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -602,3 +609,16 @@ void blocked_thread_check(struct thread *t, void *aux UNUSED){
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+struct thread* GetThreadFromTid(tid_t id){
+  struct list_elem *e;
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      if (t->tid == id){
+        return t;
+      }
+    }
+    return NULL;
+}

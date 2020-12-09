@@ -30,10 +30,10 @@ struct file_node
 
 struct ret_data
 {
-  int pid;
+  int tid;
   int ret;
   struct list_elem elem;
-}
+};
 
 
 static void syscall_handler (struct intr_frame *);
@@ -57,7 +57,7 @@ void IHalt(struct intr_frame* f);
 struct file_node *GetFile(struct thread *t, int fd);
 void ExitStatus(int status);
 int CloseFile(struct thread *t, int fd, int bAll);
-
+int alloc_fd(void);
 
 void
 syscall_init (void) 
@@ -159,11 +159,34 @@ void IExit(struct intr_frame* f) // 一个参数，正常退出时调用
 
 
 void ICreate(struct intr_frame* f){
-
+  if(!is_user_vaddr(((int*)f->esp)+6))
+  {
+    ExitStatus(-1);
+  }
+  if((const char *)*((unsigned int *)f->esp+4)==NULL)
+  {
+    f->eax=-1;
+    ExitStatus(-1);
+  }
+  bool ret=filesys_create((const char *)*((unsigned int*)f->esp+4),*((unsigned int *)f->esp+4));
+  f->eax=ret;
 }
 
 void IOpen(struct intr_frame* f){
-
+  if(!is_user_vaddr(((int*)f->esp)+2))
+  {
+    ExitStatus(-1);
+  }
+  struct thread *cur=thread_current();
+  const char *FileName=(char *)*((int *)f->esp+1);
+  if(FileName==NULL)
+  {
+    f->eax=-1;
+    ExitStatus(-1);
+  }
+  struct file_node *fn=(struct file_node *)malloc(sizeof(struct file_node));
+  fn->f=filesys_open(FileName);
+  if()
 }
 
 void IClose(struct intr_frame* f){
@@ -245,3 +268,12 @@ void ExitStatus(int status) // 非正常退出
 }
 
 int CloseFile(struct thread *t, int fd, int bAll)
+{
+
+}
+
+int alloc_fd(void)
+{
+  static int fd_cur = 2;
+  return fd_cur++;
+}
