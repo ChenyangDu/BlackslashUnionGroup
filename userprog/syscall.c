@@ -195,7 +195,7 @@ void IOpen(struct intr_frame* f){
   else 
   {
     fn->fd=alloc_fd();
-    lisy_push_back(&cur->file_list,&fn->elem);
+    list_push_back(&cur->file_list,&fn->elem);
   }  
   f->eax=fn->fd;
 }
