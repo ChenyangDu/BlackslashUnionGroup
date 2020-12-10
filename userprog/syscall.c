@@ -130,7 +130,8 @@ void IWrite(struct intr_frame* f) // 三个参数
   {
     putbuf(buffer, size);
     f->eax = 0;
-  } else
+  } 
+  else
   {
     struct thread *cur = thread_current();
     struct file_node *fn = GetFile(cur, fd); // 获取文件指针
@@ -186,14 +187,39 @@ void IOpen(struct intr_frame* f){
   }
   struct file_node *fn=(struct file_node *)malloc(sizeof(struct file_node));
   fn->f=filesys_open(FileName);
-  if()
+  if(fn->f==NULL)
+  {
+    fn->fd=-1;
+    free(fn);
+  }
+  else 
+  {
+    fn->fd=alloc_fd();
+    lisy_push_back(&cur->file_list,&fn->elem);
+  }  
+  f->eax=fn->fd;
 }
 
 void IClose(struct intr_frame* f){
+  if(!is_user_vaddr(((int*)f->esp)+2))
+  {
+    ExitStatus(-1);
+  }
+  struct thread *cur=thread_current();
+  int fd=*((int *)f->esp+1);
+  f->eax=CloseFile(cur,fd,false);
 
 }
 
 void IRead(struct intr_frame* f){
+  int *esp = (int *)f->esp;
+  if (!is_user_vaddr(esp+7)) 
+  {
+    ExitStatus(-1);
+  }
+  int fd = *(esp+2); 
+  char *buffer = (char *)*(esp+6); 
+  unsigned size = *(esp+3); 
 
 }
 
@@ -269,6 +295,28 @@ void ExitStatus(int status) // 非正常退出
 
 int CloseFile(struct thread *t, int fd, int bAll)
 {
+  struct list_elem *e,*p;
+  if(bAll)
+  {
+    while (!list_empty(&t->file_list))
+    {
+      struct file_node *fn =list_entry (list_pop_front(&t->file_list),struct file_node,elem);
+      file_close(fn->f);
+      free(fn);
+    }
+    return 0;
+  }
+  for(e=list_begin(&t->file_list);e!=list_end(&t->file_list);)
+  {
+    struct file_node *fn =list_entry (e,struct file_node,elem);
+    if(fn->fd==fd)
+    {
+      list_remove(e);
+      file_close(fn->f);
+      free(fn);
+      return 0;
+    }
+  }
 
 }
 
