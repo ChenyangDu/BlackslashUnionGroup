@@ -219,8 +219,29 @@ void IRead(struct intr_frame* f){
   }
   int fd = *(esp+2); 
   char *buffer = (char *)*(esp+6); 
-  unsigned size = *(esp+3); 
-
+  unsigned size = *(esp+3);
+  if(buffer==NULL||!is_user_vaddr(buffer+size))
+  {
+    f->eax=-1;
+    ExitStatus(-1);
+  } 
+  struct thread *cur=thread_current();
+  unsigned int i;
+  if(fd==STDIN_FILENO)
+  {
+    for(i=0;i<size;i++)
+      buffer[i]=input_getc();
+  }
+  else
+  {
+    struct file_node *fn=GetFile(cur,fd);
+    if(fn==NULL)
+    {
+      f->eax=-1;
+      return;
+    }
+    f->eax=file_read(fn->f,buffer,size); 
+  }
 }
 
 void IFileSize(struct intr_frame* f){
@@ -265,6 +286,7 @@ void IExec(struct intr_frame* f){
 }
 
 void IWait(struct intr_frame* f){
+  
 
 }
 
