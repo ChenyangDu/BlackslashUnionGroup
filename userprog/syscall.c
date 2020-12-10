@@ -224,7 +224,20 @@ void IRead(struct intr_frame* f){
 }
 
 void IFileSize(struct intr_frame* f){
-
+  if (!is_user_vaddr(((int*)f->esp)+2))
+  {
+    ExitStatus(-1);
+  }
+  
+  struct thread *cur = thread_current();
+  int fd = *((int*)f->esp+1);
+  struct file_node *fn = GetFile(cur, fd);
+  if (fn == NULL)
+  {
+    f->eax = -1;
+    return;
+  }
+  f->eax = file_length(fn->f);
 }
 
 void IExec(struct intr_frame* f){
@@ -256,19 +269,40 @@ void IWait(struct intr_frame* f){
 }
 
 void ISeek(struct intr_frame* f){
-
+  if(!is_user_vaddr(((int *)f->esp)+6))
+    ExitStatus(-1);  
+  
+  int fd=*((int *)f->esp+4); 
+  unsigned int pos=*((unsigned int *)f->esp+5); 
+  struct file_node *fl=GetFile(thread_current(),fd);
+  file_seek (fl->f,pos);
 }
 
 void IRemove(struct intr_frame* f){
-
+  if(!is_user_vaddr(((int *)f->esp)+2))
+    ExitStatus(-1); 
+  
+  char *fl=(char *)*((int *)f->esp+1);
+  f->eax=filesys_remove (fl);
 }
 
 void ITell(struct intr_frame* f){
-
+  if (!is_user_vaddr(((int*)f->esp)+2))
+    ExitStatus(1);
+  
+  int fd = *((int*)f->esp+1);
+  struct file_node *f1 = GetFile(thread_current(), fd);
+  if (f1 == NULL || f1->f == NULL)
+  {
+    f->eax = -1;
+    return;
+  }
+  f->eax = file_tell(f1->f);
 }
 
 void IHalt(struct intr_frame* f){
-
+  shutdown_power_off();
+  f->eax = 0;
 }
 
 struct file_node *GetFile(struct thread *t, int fd){
