@@ -505,6 +505,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = 0;
   t->recent_cpu = INT_TO_FIXED(0);
 
+#ifdef USERPROG
+  list_init(&(t->file_list));
+  list_init(&(t->child_list));
+  ret = 0;
+#endif
+
   old_level = intr_disable ();
   
   // 修改为按优先级插入
@@ -717,4 +723,17 @@ thread_mlfqs_update_priority (struct thread *t)
     t->priority = PRI_MIN;
   else if(t->priority > PRI_MAX)
     t->priority = PRI_MAX;
+}
+
+struct thread* GetThreadByTid(tid_t tid){
+  struct list_elem *e;
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *tmp = list_entry (e, struct thread, allelem);
+      if (tmp->tid == tid){
+        return tmp;
+      }
+    }
+    return NULL;
 }

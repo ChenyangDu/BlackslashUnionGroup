@@ -8,9 +8,12 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "threads/synch.h"
+#include "threads/malloc.h"
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
@@ -20,6 +23,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+bool is_child(tid_t tid,bool delete);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -37,11 +41,31 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+  char* save_ptr = NULL;
+  char* token = strtok_r(file_name," ",save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  tid = pipe_read(thread_current()->tid,tid,THREAD_START);
+  //查看是否可以返回一个子进程
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  {
+    palloc_free_page (fn_copy);
+    return tid;
+  }
+  enum intr_level old_level = intr_disable ();
+  struct thread *child = GetThreadByTid(tid);
+  child->parent_id = thread_current()->tid;
+  struct child_process *p = malloc(sizeof(struct child_process));
+  if(p==NULL){
+    //不太可能
+    return TID_ERROR;
+  }
+  p->tid = tid;
+  //用于检测是否为某一进程的子进程
+  list_push_back(&thread_current()->child_list,&p->elem);
+  intr_set_level (old_level);
+  palloc_free_page (fn_copy);//还要再放一次吗？
   return tid;
 }
 
@@ -53,18 +77,71 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  int* argc;
+  char* argv[255];
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+
+  char *save_ptr=NULL, *temp=NULL;
+  temp = strtok_r(file_name," ",&save_ptr);
+  
+  argv[*argc] = temp;
+
+  while (temp != NULL) {
+    (*argc)++; 
+    temp = strtok_r(NULL," ",&save_ptr);
+    argv[*argc] = temp;
+  }
+
+
+  success = load (argv[0], &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  if (!success)
+  {
+    pipe_write(thread_current()->tid,THREAD_START,TID_ERROR);
+    //给父进程发消息说明函数创建失败
+    ExitStatus(-1);
+  } 
+
+  int id = thread_current()->tid;
+  pipe_write(id,THREAD_START,id);
+  //给父进程发消息说明函数成功创建
+  int i=*argc;
+  char* addr_arr[i];//存地址
+  while(--i>=0){
+    if_.esp = if_.esp - sizeof(char)*(strlen(argv[i])+1); // "\0"
+    addr_arr[i]=(char *)if_.esp;
+    memcpy(if_.esp,argv[i],strlen(argv[i])+1);
+  }
+
+  //对齐world-align
+  while ((int)if_.esp%4!=0) {
+    if_.esp--;
+  }
+
+  i=*argc;
+  if_.esp = if_.esp-4;
+  (*(int *)if_.esp)=0;
+  while (--i>=0) {
+    if_.esp = if_.esp-4;
+    (*(char **)if_.esp) = addr_arr[i]; 
+  }
+
+  if_.esp = if_.esp-4;
+  (*(char **)if_.esp)=if_.esp+4;
+  
+  if_.esp = if_.esp-4;
+  (*(int *)if_.esp)=*argc;
+  
+  if_.esp = if_.esp-4;
+  (*(int *)if_.esp)=0;
+  palloc_free_page (file_name);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -88,7 +165,12 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  if(!is_child(child_tid,false)){
+    return -1;
+  }
+  int ret_val = pipe_read(thread_current()->tid,child_tid,WAIT_THREAD);
+  is_child(child_tid,true);
+  return ret_val;
 }
 
 /* Free the current process's resources. */
@@ -97,6 +179,10 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  printf("%s: exit(%d)\n", cur->name, cur->ret);
+  pipe_write(cur->tid,WAIT_THREAD,cur->ret);
+  //TODO : KERNEL 看运行结果
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -312,7 +398,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  if(success){
+    t->exec = file;
+    file_deny_write(file);
+  }
+  else
+  {
+    file_close (file);
+  }
   return success;
 }
 
@@ -462,4 +555,23 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+bool is_child(tid_t tid,bool delete)
+{
+  struct thread *cur = thread_current();
+  struct list_elem *e;
+
+  for(e = list_begin(&cur->child_list); e != list_end(&cur->child_list);e = list_next(e)){
+    int child_tid = list_entry(e,struct child_process,elem)->thread;
+    if(tid == child_tid){
+      if(delete){
+        list_remove(e);
+        free(list_entry(e,struct child_process,elem));
+        //注意！内存泄漏
+      }
+      return true;
+    }
+  }
+  return false;
 }
