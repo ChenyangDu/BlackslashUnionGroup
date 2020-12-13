@@ -1,6 +1,7 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 #include "threads/synch.h"
+#include "threads/thread.h"
 #define THREAD_START 0
 #define WAIT_THREAD 1
 

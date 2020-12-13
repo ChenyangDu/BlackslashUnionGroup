@@ -564,7 +564,7 @@ bool is_child(tid_t tid,bool delete)
   struct list_elem *e;
 
   for(e = list_begin(&cur->child_list); e != list_end(&cur->child_list);e = list_next(e)){
-    int child_tid = list_entry(e,struct child_process,elem)->thread;
+    int child_tid = list_entry(e,struct child_process,elem)->tid;
     if(tid == child_tid){
       if(delete){
         list_remove(e);
