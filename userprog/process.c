@@ -126,7 +126,7 @@ start_process (void *file_name_)
     if_.esp--;
   }
 
-  i=*argc;
+  i=argc;
   if_.esp = if_.esp-4;
   (*(int *)if_.esp)=0;
   while (--i>=0) {
@@ -138,7 +138,7 @@ start_process (void *file_name_)
   (*(char **)if_.esp)=if_.esp+4;
   
   if_.esp = if_.esp-4;
-  (*(int *)if_.esp)=*argc;
+  (*(int *)if_.esp)=argc;
   
   if_.esp = if_.esp-4;
   (*(int *)if_.esp)=0;
