@@ -20,6 +20,7 @@ bool if_have_waited(tid_t parentd_id);//放在syscall的wait中
 struct file_node* FindFileNode(int fd);
 int alloc_fd (void); //分配文件标识符
 bool is_valid_ptr (const void *usr_ptr);
+bool is_valid_pointer(void* esp,int cnt);
 
 void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;
@@ -49,6 +50,11 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   uint32_t *esp;
   esp = f->esp;
+  int status;
+  char *file_name;
+  int fd;
+  unsigned size;
+  int pid;
 
   if (!is_valid_ptr (esp) || !is_valid_ptr (esp + 1) ||
       !is_valid_ptr (esp + 2) || !is_valid_ptr (esp + 3))
@@ -67,20 +73,19 @@ syscall_handler (struct intr_frame *f UNUSED)
         if(!is_valid_pointer(esp+4,4)){
             ExitStatus(-1);
         }
-        int status = *(int *)(esp +4);
+        status = *(int *)(esp +4);
         exit(status);
         break;
       case SYS_EXEC:
         if(!is_valid_pointer(esp+4,4)){
           ExitStatus(-1);
         }
-        char *file_name = *(char **)(esp+4);
+        file_name = *(char **)(esp+4);
         lock_acquire(&file_lock);
         f->eax = exec (file_name);
         lock_release(&file_lock);
         break;
       case SYS_WAIT:
-        tid_t pid;
         if(!is_valid_pointer(esp+4,4)){
           ExitStatus(-1);
         }
@@ -91,7 +96,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         if(!is_valid_pointer(esp+4,4)){
           ExitStatus(-1);
         }
-        char* file_name = *(char **)(esp+4);
+        file_name = *(char **)(esp+4);
         unsigned size = *(int *)(esp+8);
         f->eax = create (file_name,size);
         break;
@@ -99,14 +104,14 @@ syscall_handler (struct intr_frame *f UNUSED)
         if (!is_valid_pointer(esp +4, 4)){
           ExitStatus(-1);
         }
-        char *file_name = *(char **)(esp+4);
+        file_name = *(char **)(esp+4);
         f->eax = remove (file_name);
         break;
       case SYS_OPEN:
       if (!is_valid_pointer(esp +4, 4)){
           ExitStatus(-1);
         }
-        char *file_name = *(char **)(esp+4);
+        file_name = *(char **)(esp+4);
         lock_acquire(&file_lock);
         f->eax = open (file_name);
         lock_release(&file_lock);
@@ -115,8 +120,8 @@ syscall_handler (struct intr_frame *f UNUSED)
         if (!is_valid_pointer(esp +4, 4)){
           ExitStatus(-1);
         }
-        int fd = *(int *)(esp + 4);
-	      f->eax = filesize ();
+        fd = *(int *)(esp + 4);
+	      f->eax = filesize (fd);
 	      break;
       case SYS_READ:
         lock_acquire(&file_lock);
