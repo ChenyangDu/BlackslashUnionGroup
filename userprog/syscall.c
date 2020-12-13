@@ -5,6 +5,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/process.h"
+#include "userprog/pagedir.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/malloc.h"
@@ -18,6 +19,7 @@ static void syscall_handler (struct intr_frame *);
 bool if_have_waited(tid_t parentd_id);//放在syscall的wait中
 struct file_node* FindFileNode(int fd);
 int alloc_fd (void); //分配文件标识符
+bool is_valid_ptr (const void *usr_ptr);
 
 void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;
@@ -351,4 +353,13 @@ struct file_node* FindFileNode(int fd)
   return NULL;
 }
 
+bool is_valid_ptr (const void *usr_ptr)
+{
+  struct thread *cur = thread_current ();
+  if (usr_ptr != NULL && is_user_vaddr (usr_ptr))
+    {
+      return (pagedir_get_page (cur->pagedir, usr_ptr)) != NULL;
+    }
+  return false;
+}
 
