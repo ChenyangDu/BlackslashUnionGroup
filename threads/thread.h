@@ -4,7 +4,6 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "fixed_point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -90,12 +89,6 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-    int64_t blocked_time;           /* 线程等待时间 */ 
-    int original_priority;              /* 线程原本的优先级 */
-    struct list lock_list;              /* 线程拥有的锁列表 */
-    struct lock *lock_waiting;      /* 正在等待的锁 */
-    fixed_t recent_cpu;             /* 最近使用的CPU */
-    int nice;
 
 
     /* Shared between thread.c and synch.c. */
@@ -119,9 +112,6 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
-
-void blocked_time_check (void); /* 阻塞时间检测函数 */
-void sleeping_list_insert (int64_t); /* 睡眠队列插入 */
 
 void thread_init (void);
 void thread_start (void);
@@ -148,14 +138,6 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-// 新建了比较线程优先级的函数
-bool thread_pr_cmp (const struct list_elem *, const struct list_elem *, void *);
-
-// 返回准备列表
-struct list *thread_get_ready_list(void);
-
-void thread_mlfqs_update_priority (struct thread *);
-void thread_mlfqs_update_load_avg_and_recent_cpu (void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);

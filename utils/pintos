@@ -113,6 +113,8 @@ sub parse_command_line {
     $align = "bochs",
       print STDERR "warning: setting --align=bochs for Bochs support\n"
 	if $sim eq 'bochs' && defined ($align) && $align eq 'none';
+
+    $kill_on_failure = 0;
 }
 
 # usage($exitcode).
@@ -827,8 +829,8 @@ sub xsystem {
 
 		# Read and print out pipe data.
 		my ($len) = length ($buf);
-		my ($n_read) = sysread ($in, $buf, 4096, $len);
-		waitpid ($pid, 0), last if !defined ($n_read) || $n_read <= 0;
+		waitpid ($pid, 0), last
+            if sysread ($in, $buf, 4096, $len) <= 0;
 		print substr ($buf, $len);
 
 		# Remove full lines from $buf and scan them for keywords.

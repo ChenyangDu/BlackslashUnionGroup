@@ -31,7 +31,6 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-// #include "threads/thread.c"
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -67,7 +66,6 @@ void sema_down(struct semaphore *sema)
   old_level = intr_disable();
   while (sema->value == 0)
   {
-    // 唤醒时排序，此处不需要按优先级插入
     list_push_back(&sema->waiters, &thread_current()->elem);
     thread_block();
   }
@@ -112,14 +110,11 @@ void sema_up(struct semaphore *sema)
 
   old_level = intr_disable();
   if (!list_empty(&sema->waiters)){
-    /* 排序 */
-    list_sort(&sema->waiters,thread_pr_cmp,NULL);
     thread_unblock(list_entry(list_pop_front(&sema->waiters),
                               struct thread, elem));
   }
     
   sema->value++;
-  thread_yield(); // 等待
   intr_set_level(old_level);
 }
 
@@ -196,65 +191,8 @@ void lock_acquire(struct lock *lock)
   ASSERT(!intr_context());
   ASSERT(!lock_held_by_current_thread(lock));
 
-    // 当前线程的指针
-  struct thread *current_thread = thread_current();
-  struct lock *lock_now;
-  struct thread *lock_now_holder;
-  enum intr_level old_level;
-
-  // 如果当前的锁被其他线程拥有
-  if (lock->holder != NULL && !thread_mlfqs)
-  {
-    current_thread->lock_waiting = lock; /* 当前线程正在等待这个锁 */
-    lock_now = lock;
-    // 当前线程的优先级 > 锁的最大优先级
-    // 循环优先级捐赠：
-    while (lock_now && current_thread->priority > lock_now->max_priority)
-    {
-      lock_now->max_priority = current_thread->priority; /* 修改锁的最大优先级 */
-      // thread_donate_priority(lock_now->holder);
-      lock_now_holder = lock_now->holder;
-      // 优先级捐赠：
-      // 更新优先级
-      list_sort(&lock_now_holder->lock_list, lock_cmp_priority, NULL);
-      int tmp = list_entry(list_front(&lock_now_holder->lock_list), struct lock, elem)->max_priority;
-      lock_now_holder->priority = tmp>lock_now_holder->original_priority?tmp:lock_now_holder->original_priority;
-      //
-      if (lock_now_holder->status == THREAD_READY)
-      {
-        // 更新等待队列的顺序
-        list_sort(thread_get_ready_list(),  thread_pr_cmp, NULL);
-      }
-      // 优先级捐赠结束
-
-      // 更新当前判断的锁
-      lock_now = lock_now_holder->lock_waiting; /* l变为其拥有者的等待的锁 */
-    }
-  }
-
-  sema_down(&lock->semaphore); /* 等待锁被释放 */
-
-  old_level = intr_disable(); /* 原子操作 */
-  // 当前线程获取锁
-  current_thread = thread_current();
-  if (!thread_mlfqs)
-  {
-    current_thread->lock_waiting = NULL;
-    lock->max_priority = current_thread->priority;
-    // 线程获得锁
-    // 维护线程锁的优先队列
-    list_insert_ordered(&current_thread->lock_list, &lock->elem, lock_cmp_priority, NULL);
-    if (lock->max_priority > current_thread->priority)
-    {
-      // 更新当前线程优先度
-      current_thread->priority = lock->max_priority;
-      // 抢占式调度，重新选择当前线程
-      thread_yield();
-    }   
-  }
+  sema_down (&lock->semaphore);
   lock->holder = thread_current();
-
-  intr_set_level(old_level); /* 原子操作结束 */
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -289,24 +227,8 @@ void lock_release(struct lock *lock)
   ASSERT(lock != NULL);
   ASSERT(lock_held_by_current_thread(lock));
 
-  old_level = intr_disable ();
-  // 将锁从线程的锁列表中删除
-  if(!thread_mlfqs){
-    list_remove(&lock->elem);
-    t = thread_current();
-    // 更新优先级
-    if (!list_empty(&t->lock_list)) {
-      // 等待队列为优先队列，删除某个元素不改变顺序
-      int tmp = list_entry(list_front(&t->lock_list), struct lock, elem)->max_priority;
-      t->priority = tmp>t->original_priority?tmp:t->original_priority;
-    } else
-      t->priority = t->original_priority;
-  }
-
   lock->holder = NULL;
   sema_up(&lock->semaphore);
-
-  intr_set_level (old_level);
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -388,8 +310,6 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
 
   if (!list_empty(&cond->waiters))
   {
-    /* 排序 */
-    list_sort(&cond->waiters,cond_pr_cmp,NULL);
     sema_up(&list_entry(list_pop_front(&cond->waiters),
                         struct semaphore_elem, elem)
                  ->semaphore);
@@ -410,18 +330,4 @@ void cond_broadcast(struct condition *cond, struct lock *lock)
 
   while (!list_empty(&cond->waiters))
     cond_signal(cond, lock);
-}
-
-// 比较锁的优先级
-bool lock_cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
-{
-  return list_entry(a,struct lock,elem)->max_priority > list_entry(b,struct lock,elem)->max_priority;
-}
-/* cond比较函数 */
-bool
-cond_pr_cmp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
-{
-  struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
-  struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
-  return list_entry(list_front(&sa->semaphore.waiters), struct thread, elem)->priority > list_entry(list_front(&sb->semaphore.waiters), struct thread, elem)->priority;
 }
