@@ -583,6 +583,5 @@ void command_break(char* command,char* argv[],int* argc){
     temp = strtok_r(NULL," ",&save);
     argv[*argc] = temp;
   }
-  free(commands);
   return ;
 }
