@@ -4,6 +4,7 @@
 #define THREAD_START 0
 #define WAIT_THREAD 1
 
+struct lock file_lock;
 
 struct file_node{//文件标识符
   int fd;
@@ -35,6 +36,7 @@ struct wait_elem{//管道等待元素
 
 void syscall_init (void);
 void ExitStatus(int status); //与syscall调用的exit区分
+void CloseFile(int fd); //与syscall调用的close区分
 void pipe_write(tid_t id,int op,int ret);
 int pipe_read(tid_t p_id,tid_t c_id,int op);
 

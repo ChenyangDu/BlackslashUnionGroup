@@ -182,6 +182,7 @@ process_exit (void)
 
   printf("%s: exit(%d)\n", cur->name, cur->ret);
   pipe_write(cur->tid,WAIT_THREAD,cur->ret);
+  file_close(cur->exec);
   //TODO : KERNEL 看运行结果
 
   /* Destroy the current process's page directory and switch back

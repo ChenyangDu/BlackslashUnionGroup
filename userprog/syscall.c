@@ -3,6 +3,12 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "userprog/process.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "threads/malloc.h"
+#include "threads/synch.h"
 
 static struct list read_list;
 static struct list wait_list;
@@ -10,6 +16,22 @@ static struct list wait_list;
 
 static void syscall_handler (struct intr_frame *);
 bool if_have_waited(tid_t parentd_id);//放在syscall的wait中
+struct file_node* FindFileNode(int fd);
+int alloc_fd (void); //分配文件标识符
+
+void halt (void) NO_RETURN;
+void exit (int status) NO_RETURN;
+tid_t exec (const char *file);
+int wait (tid_t);//pid和tid是一样的
+bool create (const char *file, unsigned initial_size);
+bool remove (const char *file);
+int open (const char *file);
+int filesize (int fd);
+int read (int fd, void *buffer, unsigned length);
+int write (int fd, const void *buffer, unsigned length);
+void seek (int fd, unsigned position);
+unsigned tell (int fd);
+void close (int fd);
 
 void
 syscall_init (void) 
@@ -17,15 +39,233 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init(&read_list);
   list_init(&wait_list);
+  lock_init(&file_lock);
 }
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
+  uint32_t *esp;
+  esp = f->esp;
+
+  if (!is_valid_ptr (esp) || !is_valid_ptr (esp + 1) ||
+      !is_valid_ptr (esp + 2) || !is_valid_ptr (esp + 3))
+  {
+    ExitStatus (-1);
+  }
+  else
+  {
+    int syscall_num = *esp;
+    switch (syscall_num)
+    {
+      case SYS_HALT:
+        halt ();
+        break;
+      case SYS_EXIT:
+        exit (*(esp + 1));
+        break;
+      case SYS_EXEC:
+        lock_acquire(&file_lock);
+        f->eax = exec ((char *) *(esp + 1));
+        lock_release(&file_lock);
+        break;
+      case SYS_WAIT:
+        f->eax = wait (*(esp + 1));
+        break;
+      case SYS_CREATE:
+        f->eax = create ((char *) *(esp + 1), *(esp + 2));
+        break;
+      case SYS_REMOVE:
+        f->eax = remove ((char *) *(esp + 1));
+        break;
+      case SYS_OPEN:
+        lock_acquire(&file_lock);
+        f->eax = open ((char *) *(esp + 1));
+        lock_release(&file_lock);
+        break;
+      case SYS_FILESIZE:
+	      f->eax = filesize (*(esp + 1));
+	      break;
+      case SYS_READ:
+        lock_acquire(&file_lock);
+        f->eax = read (*(esp + 1), (void *) *(esp + 2), *(esp + 3));
+        lock_release(&file_lock);
+        break;
+      case SYS_WRITE:
+        lock_acquire(&file_lock);
+        f->eax = write (*(esp + 1), (void *) *(esp + 2), *(esp + 3));
+        lock_release(&file_lock);
+        break;
+      case SYS_SEEK:
+        seek (*(esp + 1), *(esp + 2));
+        break;
+      case SYS_TELL:
+        f->eax = tell (*(esp + 1));
+        break;
+      case SYS_CLOSE:
+        close (*(esp + 1));
+        break;
+      default:
+        ExitStatus(-1);
+    }
+  }
+}
+
+void halt(void)
+{
+  shutdown_power_off();
+}
+
+void exit (int status) 
+{
+  ExitStatus(status);
+}
+
+tid_t exec (const char *file)
+{
+  return process_execute(file);
+}
+
+
+int wait (tid_t pid){
+  if(if_have_waited(thread_current()->tid))
+  {
+    return -1;
+    //已调用wait
+  }
+  return process_wait(pid);
+}
+
+bool create (const char *file, unsigned initial_size){
+    return filesys_create(file,initial_size);
+}
+
+bool remove (const char *file){
+  return filesys_remove(file);
+}
+
+int open (const char *file){
+    struct file* f = filesys_open(file);
+    if(f == NULL){
+      return -1;
+    }
+
+    struct file_node *f_node = (struct file_node *)malloc(sizeof(struct file_node));                                   
+    if(f_node == NULL){
+      file_close(f);
+      return -1; //不太可能
+    }
+    struct thread *cur = thread_current();
+    f_node->fd = alloc_fd();
+    f_node->file = f;
+    list_push_back(&cur->file_list,&f_node->elem);
+    return f_node->fd;
+}
+
+int filesize (int fd){
+
+  struct file *f = FindFileNode(fd);
+  if(f == NULL){
+    ExitStatus(-1);
+    //文件未打开或不存在
+  }
+  return file_length(f);
+
+}
+
+
+int read (int fd, void *buffer, unsigned length){
+  if(fd==STDIN_FILENO){
+    for(unsigned int i=0;i<length;i++){
+      *((char **)buffer)[i] = input_getc();
+      //copy
+    }
+    return length;
+  }
+  else{
+    struct file *f = FindFileNode(fd);
+    if(f == NULL){
+      return -1;
+    }
+    return file_read(f,buffer,length);
+  }
+}
+
+int write (int fd, const void *buffer, unsigned length){
+  if(fd==STDOUT_FILENO){ // stdout
+      putbuf((char *) buffer,(size_t)length);
+      return (int)length;
+  }
+  else{
+    struct file *f = FindFileNode(fd);
+    if(f==NULL){
+      ExitStatus(-1);
+      //文件未打开或不存在
+    }
+    return (int) file_write(f,buffer,length);
+  }
+}
+
+void seek (int fd, unsigned position)
+{
+  struct file *f = FindFileNode(fd);
+  if(f == NULL){
+    ExitStatus(-1);
+    //文件未打开或不存在
+  }
+  file_seek(f,position);
+}
+
+unsigned tell (int fd){
+  struct file *f = FindFileNode(fd);
+  if(f == NULL){
+    ExitStatus(-1);
+  }
+  return file_tell(f);
+  //文件未打开或不存在
+}
+
+void close (int fd)
+{
+  CloseFile(fd);
+}
+
+
+int alloc_fd (void)
+{
+  static int fd = 2;
+  return fd++;
+}
+
+
+void ExitStatus(int status)
+{
+  struct thread *t;
+  struct list_elem *l;
+
+  t = thread_current ();
+  while (!list_empty (&t->file_list))
+  {
+    l = list_begin (&t->file_list);
+    CloseFile (list_entry (l, struct file_node, elem)->fd);
+  }
+
+  t->ret = status;
   thread_exit ();
 }
 
+void CloseFile(int fd)
+{
+  struct file_node *f = FindFileNode(fd);
+
+  // close more than once will fail
+  if(f == NULL){
+    return;
+  }
+  file_close (f->file);
+  list_remove (&f->elem);
+  free (f);
+}
 
 
 void pipe_write(tid_t id,int op,int ret){
@@ -91,6 +331,24 @@ bool if_have_waited(tid_t parentd_id){
   }
   intr_set_level(old_level);
   return false;
+}
+
+struct file_node* FindFileNode(int fd)
+{
+  struct file_node *retfile;
+  struct list_elem *l;
+  struct thread *t;
+
+  t = thread_current ();
+
+  for (l = list_begin (&t->file_list); l != list_end (&t->file_list); l = list_next (l))
+    {
+      retfile = list_entry (l, struct file_node, elem);
+      if (retfile->fd == fd)
+        return retfile;
+    }
+
+  return NULL;
 }
 
 
