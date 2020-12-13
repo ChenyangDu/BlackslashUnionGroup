@@ -24,7 +24,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 bool is_child(tid_t tid,bool delete);
-char* extract_command(char* command,char* argv[],int* argc);
+void command_break(char* command,char* argv[],int* argc);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -44,8 +44,8 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
   char *argv[100];
   int argc;
-  char* command_bak = extract_command(file_name,argv,&argc);
 
+  command_break(file_name,argv,&argc);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (argv[0], PRI_DEFAULT, start_process, fn_copy);
   tid = pipe_read(thread_current()->tid,tid,THREAD_START);
@@ -87,9 +87,8 @@ start_process (void *file_name_)
 
   char *argv[100];
   int argc;
-  char* command_bak = extract_command(file_name,argv,&argc);
 
-
+  command_break(file_name,argv,&argc);
   success = load (argv[0], &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
@@ -569,18 +568,14 @@ bool is_child(tid_t tid,bool delete)
   return false;
 }
 
-char* extract_command(char* command,char* argv[],int* argc){
-  char* command_bak = NULL;
+void command_break(char* command,char* argv[],int* argc){
+  char* commands = NULL;
   *argc=0;
-  command_bak = malloc(strlen(command)+1);
+  commands = malloc(strlen(command)+1);
   char* save = NULL;
   char* temp = NULL;
-
-  // to command_bak, from command
-  strlcpy(command_bak,command,PGSIZE);
-
-
-  temp = strtok_r(command_bak," ",&save);
+  strlcpy(commands,command,PGSIZE);
+  temp = strtok_r(commands," ",&save);
   argv[*argc] = temp;
 
   while (temp != NULL) {
@@ -588,5 +583,6 @@ char* extract_command(char* command,char* argv[],int* argc){
     temp = strtok_r(NULL," ",&save);
     argv[*argc] = temp;
   }
-  return command_bak;
+  free(commands);
+  return ;
 }
