@@ -64,59 +64,29 @@ syscall_handler (struct intr_frame *f UNUSED)
         halt ();
         break;
       case SYS_EXIT:
-        if(!is_valid_pointer(esp+4,4)){
-            ExitStatus(-1);
-        }
-        int status = *(int *)(esp +4);
-        exit(status);
+        exit (*(esp + 1));
         break;
       case SYS_EXEC:
-        if(!is_valid_pointer(esp+4,4)){
-          ExitStatus(-1);
-        }
-        char *file_name = *(char **)(esp+4);
         lock_acquire(&file_lock);
-        f->eax = exec (file_name);
+        f->eax = exec ((char *) *(esp + 1));
         lock_release(&file_lock);
         break;
       case SYS_WAIT:
-        tid_t pid;
-        if(!is_valid_pointer(esp+4,4)){
-          ExitStatus(-1);
-        }
-        pid = *((int*)esp+1);
-        f->eax = wait (pid);
+        f->eax = wait (*(esp + 1));
         break;
       case SYS_CREATE:
-        if(!is_valid_pointer(esp+4,4)){
-          ExitStatus(-1);
-        }
-        char* file_name = *(char **)(esp+4);
-        unsigned size = *(int *)(esp+8);
-        f->eax = create (file_name,size);
+        f->eax = create ((char *) *(esp + 1), *(esp + 2));
         break;
       case SYS_REMOVE:
-        if (!is_valid_pointer(esp +4, 4)){
-          ExitStatus(-1);
-        }
-        char *file_name = *(char **)(esp+4);
-        f->eax = remove (file_name);
+        f->eax = remove ((char *) *(esp + 1));
         break;
       case SYS_OPEN:
-      if (!is_valid_pointer(esp +4, 4)){
-          ExitStatus(-1);
-        }
-        char *file_name = *(char **)(esp+4);
         lock_acquire(&file_lock);
-        f->eax = open (file_name);
+        f->eax = open ((char *) *(esp + 1));
         lock_release(&file_lock);
         break;
       case SYS_FILESIZE:
-        if (!is_valid_pointer(esp +4, 4)){
-          ExitStatus(-1);
-        }
-        int fd = *(int *)(esp + 4);
-	      f->eax = filesize ();
+	      f->eax = filesize (*(esp + 1));
 	      break;
       case SYS_READ:
         lock_acquire(&file_lock);
@@ -393,15 +363,3 @@ bool is_valid_ptr (const void *usr_ptr)
   return false;
 }
 
-bool is_valid_pointer(void* esp,int cnt){
-  //为bad-ptr新加
-  int i = 0;
-  for (; i < cnt; ++i)
-  {
-    if((!is_user_vaddr(esp))||(pagedir_get_page(thread_current()->pagedir,esp)==NULL))
-    {
-      return false;
-    }
-  }
-  return true;
-}
