@@ -67,7 +67,6 @@ process_execute (const char *file_name)
   //用于检测是否为某一进程的子进程
   list_push_back(&thread_current()->child_list,&p->elem);
   intr_set_level (old_level);
-  palloc_free_page (fn_copy);//还要再放一次吗？
   return tid;
 }
 
@@ -79,9 +78,6 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  int argc;
-  int* argt = &argc;
-  char* argv[255];
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
