@@ -77,7 +77,8 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  int* argc;
+  int argc;
+  int* argt = &argc;
   char* argv[255];
 
   /* Initialize interrupt frame and load executable. */
@@ -89,12 +90,12 @@ start_process (void *file_name_)
   char *save_ptr=NULL, *temp=NULL;
   temp = strtok_r(file_name," ",&save_ptr);
   
-  argv[*argc] = temp;
+  argv[*argt] = temp;
 
   while (temp != NULL) {
-    (*argc)++; 
+    (*argt)++; 
     temp = strtok_r(NULL," ",&save_ptr);
-    argv[*argc] = temp;
+    argv[*argt] = temp;
   }
 
 
@@ -112,7 +113,7 @@ start_process (void *file_name_)
   int id = thread_current()->tid;
   pipe_write(id,THREAD_START,id);
   //给父进程发消息说明函数成功创建
-  int i=*argc;
+  int i=argc;
   char* addr_arr[255];//存地址
   while(--i>=0){
     if_.esp = if_.esp - sizeof(char)*(strlen(argv[i])+1); // "\0"
