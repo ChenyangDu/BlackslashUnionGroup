@@ -101,7 +101,7 @@ start_process (void *file_name_)
   success = load (argv[0], &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  //palloc_free_page (file_name);
   if (!success)
   {
     pipe_write(thread_current()->tid,THREAD_START,TID_ERROR);
@@ -113,7 +113,7 @@ start_process (void *file_name_)
   pipe_write(id,THREAD_START,id);
   //给父进程发消息说明函数成功创建
   int i=*argc;
-  char* addr_arr[i];//存地址
+  char* addr_arr[255];//存地址
   while(--i>=0){
     if_.esp = if_.esp - sizeof(char)*(strlen(argv[i])+1); // "\0"
     addr_arr[i]=(char *)if_.esp;
