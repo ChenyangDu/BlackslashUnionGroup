@@ -105,15 +105,33 @@ struct wait_elem{//管道等待元素
     struct file *exec;       /* 此当前进程运行文件 */
 ```
 ##### B2: Describe how file descriptors are associated with open files. Are file descriptors unique within the entire OS or just within a single process?
+
+每次文件被打开时，系统会新建一个文件标识符的结构体，其成员包括被打开的文件的指针，以及一个整个系统内唯一的整数值（用来标识文件）。所以我们的实现中文件标识符对于全系统来说都是唯一的，但进程也会维持一个自己打开的文件的列表。
+
 ### ALGORITHMS 
 
 ##### B3: Describe your code for reading and writing user data from the kernel.
 
+在系统调用读，写时，首先检查传入的帧的所有参数空间是否有效，将文件标识符，buffer，size提取出来后，再检查buffer以及buffer+size的指针是否都有效。如果其中有无效地址，则退出，返回值为-1，否则则继续执行。
+
 ##### B4: Suppose a system call causes a full page (4,096 bytes) of data to be copied from user space into the kernel.  What is the least and the greatest possible number of inspections of the page table (e.g. calls to `pagedir_get_page()`) that might result?  What about for a system call that only copies 2 bytes of data?  Is there room for improvement in these numbers, and how much?
+
+最少次数为1，最大次数为4096。当`pagedir_get_page()`没有验证指针，且所有数据都存储在单个页面上，则只需调用一次，若数据的字节分布在4096页中，则需要调用4096次。对于2 bytes 数据的情况，最少1次，最多2次。
+
+我们目前没有什么比较好的方法来提高。
 
 ##### B5: Briefly describe your implementation of the "wait" system call and how it interacts with process termination.
 
+系统调用`wait`会直接调用`process_wait`。在这方面我们参考了管道的设计，进程退出时会向一个管道内写入退出信息，当父进程需要等待时，会先检查该管道内是否有需要的子进程的信息，如果有则读取，返回，如果没有则会写入wait请求并阻塞。当一个子进程退出时，会先写入退出信息，然后检查有没有父进程的wait请求，有的话就会唤醒父进程。
+
 ##### B6: Any access to user program memory at a user-specified address can fail due to a bad pointer value.  Such accesses must cause the process to be terminated.  System calls are fraught with such accesses, e.g. a "write" system call requires reading the system call number from the user stack, then each of the call's three arguments, then an arbitrary amount of user memory, and any of these can fail at any point.  This poses a design and error-handling problem: how do you best avoid obscuring the primary function of code in a morass of error-handling?  Furthermore, when an error is detected, how do you ensure that all temporarily allocated resources (locks, buffers, etc.) are freed?  In a few paragraphs, describe the strategy or strategies you adopted for managing these issues.  Give an example.
+
+在执行相关操作之前，首先检查参数空间是否有效，确保该空间是用户空间（`is_user_vaddr`）且调用`pagedir_get_page()`的返回值不为空，在取出相应的参数后，再检查参数所指向的空间是否有效，如buffer的起始地址和终止地址（buffer+size）。
+
+比如：对于write系统调用：
+
+​	首先对esp+4到esp+16进行检查（检查参数位置是否有效），有效后取出参数buffer和size，检查buffer和buffer+size的地址是否有效，最后执行write操作。
+
 ### SYNCHRONIZATION 
 
 ##### B7: The "exec" system call returns -1 if loading the new executable fails, so it cannot return before the new executable has completed loading.  How does your code ensure this?  How is the load success/failure status passed back to the thread that calls "exec"?
@@ -150,3 +168,4 @@ struct wait_elem{//管道等待元素
 
 ##### B11: The default `tid_t` to `pid_t` mapping is the identity mapping. If you changed it, what advantages are there to your approach?
 我们没有改变它。现在每个进程都对应一个线程。优点则在于如果改变了，那么一个进程就可以对应多个不同的线程。
+##### B11: The default `tid_t` to `pid_t` mapping is the identity mapping. If you changed it, what advantages are there to your approach?
