@@ -15,6 +15,8 @@
 | 任博林 | 18373691 | 1.1  |
 | 高  锐 | 17351046 | 0.7  |
 
+![](img\thread-github.png)
+
 ### PRELIMINARIES
 
 ##### If you have any preliminary comments on your submission, notes for the TAs, or extra credit, please give them here.
