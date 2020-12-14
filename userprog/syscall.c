@@ -22,6 +22,7 @@ struct file* FindFile(int fd);
 int alloc_fd (void); //分配文件标识符
 bool is_valid_ptr (void* esp,int cnt);
 bool is_valid_string(void *str);
+int get_user (const uint8_t *uaddr);
 
 void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;
@@ -150,7 +151,7 @@ void IWait(struct intr_frame* f)
 
 void ICreate(struct intr_frame* f)
 {
-  if(!is_valid_ptr(f->esp+4,8)){
+  if(!is_valid_ptr(f->esp+4,4)){
     ExitStatus(-1);
   }
   char* file_name = *(char **)(f->esp+4);
@@ -182,7 +183,7 @@ void IOpen(struct intr_frame* f)
     ExitStatus(-1);
   }
   char *file_name = *(char **)(f->esp+4);
-  if (!is_valid_string(file_name){
+  if (!is_valid_string(file_name)){
     ExitStatus(-1);
   }
   lock_acquire(&file_lock);
@@ -535,8 +536,7 @@ bool is_valid_string(void *str){
 }
 
 //魔改提供的get_user函数
-static int
-get_user (const uint8_t *uaddr)
+int get_user (const uint8_t *uaddr)
 {
   if(!is_user_vaddr((void *)uaddr)){
     return -1;
