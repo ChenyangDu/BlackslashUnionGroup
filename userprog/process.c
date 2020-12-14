@@ -173,9 +173,7 @@ process_exit (void)
   pipe_write(cur->tid,WAIT_THREAD,cur->ret);
   file_close(cur->exec);
   //TODO : KERNEL 看运行结果
-  if(cur->tid==1){
-    return;
-  }
+  
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

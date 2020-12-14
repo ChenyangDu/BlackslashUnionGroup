@@ -134,10 +134,13 @@ void IExit(struct intr_frame* f)
 
 void IExec(struct intr_frame* f)
 {
-  if(!is_valid_ptr(f->esp+4,4)||!is_valid_string(*(char **)(f->esp + 4))){
+  if(!is_valid_ptr(f->esp+4,4)){
     ExitStatus(-1);
   }
   char *file_name = *(char **)(f->esp+4);
+  if(!is_valid_string(file_name)){
+    ExitStatus(-1);
+  }
   lock_acquire(&file_lock);
   f->eax = exec(file_name);
   lock_release(&file_lock);
@@ -522,7 +525,7 @@ bool is_valid_ptr(void* esp,int cnt){
   int i = 0;
   for (; i < cnt; ++i)
   {
-    if((!is_user_vaddr(esp))||(pagedir_get_page(thread_current()->pagedir,esp)==NULL))
+    if((!is_user_vaddr(esp+i))||(pagedir_get_page(thread_current()->pagedir,esp+i)==NULL))
     {
       return false;
     }
