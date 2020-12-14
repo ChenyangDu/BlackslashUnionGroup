@@ -32,7 +32,7 @@
 
 ##### A1: Copy here the declaration of each new or changed `struct` or `struct` member, global or static variable, `typedef`, or enumeration.  Identify the purpose of each in 25 words or less.
 
-
+None.
 
 ### ALGORITHMS
 
@@ -42,20 +42,68 @@
 
 ##### How do you avoid overflowing the stack page?
 
-
+对于参数传递问题，我们在start_process函数中进行处理。为了更加便捷地处理字符串，我们新建了command_break函数。为了保证使参数的顺序正确，我们从后向前倒序扫描参数字符串，因此我们得到的第一个标记是最后一个参数，我们得到的最后一个标记是第一个参数。我们可以继续减少esp指针以设置argv[]元素。代码如下所示：
+```c
+int i=argc;
+char* addr_arr[100];//存地址
+while(--i>=0){
+    if_.esp = if_.esp - sizeof(char)*(strlen(argv[i])+1); // "\0"
+    addr_arr[i]=(char *)if_.esp;
+    memcpy(if_.esp,argv[i],strlen(argv[i])+1);
+}
+```
 
 ### RATIONALE 
 
 ##### A3: Why does Pintos implement strtok_r() but not strtok()?
 
+strtok_r()更具线程安全性。它是可重入的，以避免另一个线程获得控制权并调用strtok,
+
 ##### A4: In Pintos, the kernel separates commands into a executable name and arguments.  In Unix-like systems, the shell does this separation.  Identify at least two advantages of the Unix approach.
+
+1. 在内核级别减少了不必要的工作，可以缩短运行的时间。
+2. 在将可执行文件传递给内核之前检查它是否存在，以避免内核错误，保证了可靠性。
 
 # SYSTEM CALLS
 
 ### DATA STRUCTURES ----
 
 ##### B1: Copy here the declaration of each new or changed `struct` or`struct` member, global or static variable, `typedef`, or enumeration.  Identify the purpose of each in 25 words or less.
+```c
+在syscall.h中加入以下结构体
+struct file_node{//文件标识符
+  int fd;
+  struct list_elem elem; 
+  struct file* file; 
+};
 
+struct child_process{
+  tid_t tid; // 进程标识符
+  struct list_elem elem;
+};
+
+struct read_elem{//管道读元素
+  tid_t tid;
+  int op;
+  struct list_elem elem;
+  int ret_value;
+};
+
+struct wait_elem{//管道等待元素
+  tid_t parent_tid;
+  //等待只由父进程调用，防止出现二次调用父进程的情况
+  tid_t child_tid;
+  int op;
+  struct list_elem elem;
+  struct semaphore WaitSema;
+};
+在struct thread中加入以下成员变量
+    tid_t parent_id;              /* 父进程*/
+    struct list child_list;      /* 子进程序列 */
+    struct list file_list;       /* 打开文件列表*/
+    int ret;                     /* 返回值*/
+    struct file *exec;       /* 此当前进程运行文件 */
+```
 ##### B2: Describe how file descriptors are associated with open files. Are file descriptors unique within the entire OS or just within a single process?
 ### ALGORITHMS 
 
