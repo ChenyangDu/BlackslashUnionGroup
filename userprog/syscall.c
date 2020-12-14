@@ -18,9 +18,10 @@ static struct list wait_list;
 static void syscall_handler (struct intr_frame *);
 bool if_have_waited(tid_t parentd_id);//放在syscall的wait中
 struct file_node* FindFileNode(int fd);
+struct file* FindFile(int fd);
 int alloc_fd (void); //分配文件标识符
-bool is_valid_ptr (const void *usr_ptr);
-bool is_valid_pointer(void* esp,int cnt);
+bool is_valid_ptr (void* esp,int cnt);
+bool is_valid_string(void *str);
 
 void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;
@@ -36,6 +37,20 @@ void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
 
+void IHalt(struct intr_frame* f); 
+void IExit(struct intr_frame* f); 
+void IExec(struct intr_frame* f); 
+void IWait(struct intr_frame* f); 
+void ICreate(struct intr_frame* f); 
+void IRemove(struct intr_frame* f);
+void IOpen(struct intr_frame* f); 
+void IFilesize(struct intr_frame* f);
+void IRead(struct intr_frame* f);  
+void IWrite(struct intr_frame* f); 
+void ISeek(struct intr_frame* f); 
+void ITell(struct intr_frame* f); 
+void IClose(struct intr_frame* f); 
+
 void
 syscall_init (void) 
 {
@@ -50,103 +65,201 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   uint32_t *esp;
   esp = f->esp;
-  int status;
-  char *file_name;
-  int fd;
-  unsigned size;
-  int pid;
-
-  if (!is_valid_ptr (esp) || !is_valid_ptr (esp + 1) ||
-      !is_valid_ptr (esp + 2) || !is_valid_ptr (esp + 3))
+  int syscall_num = *esp;
+  switch (syscall_num)
   {
-    ExitStatus (-1);
-  }
-  else
-  {
-    int syscall_num = *esp;
-    switch (syscall_num)
-    {
-      case SYS_HALT:
-        halt ();
-        break;
-      case SYS_EXIT:
-        if(!is_valid_pointer(esp+4,4)){
-            ExitStatus(-1);
-        }
-        status = *(int *)(esp +4);
-        exit(status);
-        break;
-      case SYS_EXEC:
-        if(!is_valid_pointer(esp+4,4)){
-          ExitStatus(-1);
-        }
-        file_name = *(char **)(esp+4);
-        lock_acquire(&file_lock);
-        f->eax = exec (file_name);
-        lock_release(&file_lock);
-        break;
-      case SYS_WAIT:
-        if(!is_valid_pointer(esp+4,4)){
-          ExitStatus(-1);
-        }
-        pid = *((int*)esp+1);
-        f->eax = wait (pid);
-        break;
-      case SYS_CREATE:
-        if(!is_valid_pointer(esp+4,4)){
-          ExitStatus(-1);
-        }
-        file_name = *(char **)(esp+4);
-        unsigned size = *(int *)(esp+8);
-        f->eax = create (file_name,size);
-        break;
-      case SYS_REMOVE:
-        if (!is_valid_pointer(esp +4, 4)){
-          ExitStatus(-1);
-        }
-        file_name = *(char **)(esp+4);
-        f->eax = remove (file_name);
-        break;
-      case SYS_OPEN:
-      if (!is_valid_pointer(esp +4, 4)){
-          ExitStatus(-1);
-        }
-        file_name = *(char **)(esp+4);
-        lock_acquire(&file_lock);
-        f->eax = open (file_name);
-        lock_release(&file_lock);
-        break;
-      case SYS_FILESIZE:
-        if (!is_valid_pointer(esp +4, 4)){
-          ExitStatus(-1);
-        }
-        fd = *(int *)(esp + 4);
-	      f->eax = filesize (fd);
-	      break;
-      case SYS_READ:
-        lock_acquire(&file_lock);
-        f->eax = read (*(esp + 1), (void *) *(esp + 2), *(esp + 3));
-        lock_release(&file_lock);
-        break;
-      case SYS_WRITE:
-        lock_acquire(&file_lock);
-        f->eax = write (*(esp + 1), (void *) *(esp + 2), *(esp + 3));
-        lock_release(&file_lock);
-        break;
-      case SYS_SEEK:
-        seek (*(esp + 1), *(esp + 2));
-        break;
-      case SYS_TELL:
-        f->eax = tell (*(esp + 1));
-        break;
-      case SYS_CLOSE:
-        close (*(esp + 1));
-        break;
-      default:
-        ExitStatus(-1);
-    }
+    case SYS_HALT:
+      IHalt(f);
+      break;
+    case SYS_EXIT:
+      IExit(f);
+      break;
+    case SYS_EXEC:
+      IExec(f);
+      break;
+    case SYS_WAIT:
+      IWait(f);
+      break;
+    case SYS_CREATE:
+      ICreate(f);
+      break;
+    case SYS_REMOVE:
+      IRemove(f);
+      break;
+    case SYS_OPEN:
+      IOpen(f);
+      break;
+    case SYS_FILESIZE:
+      IFilesize(f);
+      break;
+    case SYS_READ:
+      IRead(f);
+      break;
+    case SYS_WRITE:
+      IWrite(f);
+      break;
+    case SYS_SEEK:
+      ISeek(f);
+      break;
+    case SYS_TELL:
+      ITell(f);
+      break;
+    case SYS_CLOSE:
+      IClose(f);
+      break;
+    default:
+      ExitStatus(-1);
   }
 }
+
+void IHalt(struct intr_frame* f)
+{
+  halt();
+  return;
+} 
+
+void IExit(struct intr_frame* f)
+{
+  if(!is_valid_ptr(f->esp+4,4)){
+    ExitStatus(-1);
+  }
+  int status = *(int *)(f->esp +4);
+  exit(status);
+} 
+
+void IExec(struct intr_frame* f)
+{
+  if(!is_valid_ptr(f->esp+4,4)||!is_valid_string(*(char **)(f->esp + 4))){
+    ExitStatus(-1);
+  }
+  char *file_name = *(char **)(f->esp+4);
+  lock_acquire(&file_lock);
+  f->eax = exec(file_name);
+  lock_release(&file_lock);
+} 
+
+void IWait(struct intr_frame* f)
+{
+  int pid;
+  if(!is_valid_ptr(f->esp+4,4)){
+    ExitStatus(-1);
+  }
+  pid = *((int*)f->esp+1);
+  f->eax = wait(pid);
+}
+
+void ICreate(struct intr_frame* f)
+{
+  if(!is_valid_ptr(f->esp+4,8)){
+    ExitStatus(-1);
+  }
+  char* file_name = *(char **)(f->esp+4);
+  if(!is_valid_string(file_name)){
+    ExitStatus(-1);
+  }
+  // if(!is_valid_ptr(f->esp+8,4)){
+  //   ExitStatus(-1);
+  // }
+  unsigned size = *(int *)(f->esp+8);
+  f->eax = create(file_name,size);
+} 
+
+void IRemove(struct intr_frame* f)
+{
+  if (!is_valid_ptr(f->esp +4, 4)){
+    ExitStatus(-1);
+  }
+  char *file_name = *(char **)(f->esp+4);
+  if(!is_valid_string(file_name)){
+    ExitStatus(-1);
+  }
+  f->eax = remove(file_name);
+}
+
+void IOpen(struct intr_frame* f)
+{
+  if (!is_valid_ptr(f->esp +4, 4)){
+    ExitStatus(-1);
+  }
+  char *file_name = *(char **)(f->esp+4);
+  if (!is_valid_string(file_name){
+    ExitStatus(-1);
+  }
+  lock_acquire(&file_lock);
+  f->eax = open(file_name);
+  lock_release(&file_lock);
+}
+
+void IFilesize(struct intr_frame* f)
+{
+  if (!is_valid_ptr(f->esp +4, 4)){
+    ExitStatus(-1);
+  }
+  int fd = *(int *)(f->esp + 4);
+  f->eax = filesize(fd);
+}
+
+void IRead(struct intr_frame* f)
+{
+  if (!is_valid_ptr(f->esp + 4, 12)){
+    ExitStatus(-1);
+  }
+  int fd = *(int *)(f->esp + 4);
+  void *buffer = *(char**)(f->esp + 8);
+  unsigned size = *(unsigned *)(f->esp + 12);
+  if (!is_valid_ptr(buffer, 1) || !is_valid_ptr(buffer + size,1)){
+    ExitStatus(-1);
+  }
+  lock_acquire(&file_lock);
+  f->eax = read(fd,buffer,size);
+  lock_release(&file_lock);
+}  
+
+void IWrite(struct intr_frame* f)
+{
+  if(!is_valid_ptr(f->esp+4,12)){
+    ExitStatus(-1);
+  }
+  int fd = *(int *)(f->esp +4);
+  void *buffer = *(char**)(f->esp + 8);
+  unsigned size = *(unsigned *)(f->esp + 12);
+  if (!is_valid_ptr(buffer, 1) || !is_valid_ptr(buffer + size,1)){
+    ExitStatus(-1);
+  }
+  lock_acquire(&file_lock);
+  f->eax = write(fd,buffer,size);
+  lock_release(&file_lock);
+  return;
+} 
+
+void ISeek(struct intr_frame* f)
+{
+  if (!is_valid_ptr(f->esp +4, 8)){
+    ExitStatus(-1);
+  }
+  int fd = *(int *)(f->esp + 4);
+  unsigned pos = *(unsigned *)(f->esp + 8);
+  seek(fd,pos);
+} 
+
+void ITell(struct intr_frame* f)
+{
+  if (!is_valid_ptr(f->esp +4, 4)){
+    ExitStatus(-1);
+  }
+  int fd = *(int *)(f->esp + 4);
+  f->eax = tell(fd);
+} 
+
+void IClose(struct intr_frame* f)
+{
+  if (!is_valid_ptr(f->esp +4, 4)){
+    return ExitStatus(-1);
+  }
+  int fd = *(int *)(f->esp + 4);
+  close(fd);
+} 
+
 
 void halt(void)
 {
@@ -165,11 +278,11 @@ tid_t exec (const char *file)
 
 
 int wait (tid_t pid){
-  // if(if_have_waited(thread_current()->tid))
-  // {
-  //   return -1;
-  //   //已调用wait
-  // }
+  if(if_have_waited(thread_current()->tid))
+  {
+    return -1;
+    //已调用wait
+  }
   return process_wait(pid);
 }
 
@@ -201,7 +314,7 @@ int open (const char *file){
 
 int filesize (int fd){
 
-  struct file *f = FindFileNode(fd);
+  struct file *f = FindFile(fd);
   if(f == NULL){
     ExitStatus(-1);
     //文件未打开或不存在
@@ -220,7 +333,7 @@ int read (int fd, void *buffer, unsigned length){
     return length;
   }
   else{
-    struct file *f = FindFileNode(fd);
+    struct file *f = FindFile(fd);
     if(f == NULL){
       return -1;
     }
@@ -234,7 +347,7 @@ int write (int fd, const void *buffer, unsigned length){
       return (int)length;
   }
   else{
-    struct file *f = FindFileNode(fd);
+    struct file *f = FindFile(fd);
     if(f==NULL){
       ExitStatus(-1);
       //文件未打开或不存在
@@ -245,7 +358,7 @@ int write (int fd, const void *buffer, unsigned length){
 
 void seek (int fd, unsigned position)
 {
-  struct file *f = FindFileNode(fd);
+  struct file *f = FindFile(fd);
   if(f == NULL){
     ExitStatus(-1);
     //文件未打开或不存在
@@ -254,7 +367,7 @@ void seek (int fd, unsigned position)
 }
 
 unsigned tell (int fd){
-  struct file *f = FindFileNode(fd);
+  struct file *f = FindFile(fd);
   if(f == NULL){
     ExitStatus(-1);
   }
@@ -388,17 +501,17 @@ struct file_node* FindFileNode(int fd)
   return NULL;
 }
 
-bool is_valid_ptr (const void *usr_ptr)
+struct file* FindFile(int fd)
 {
-  struct thread *cur = thread_current ();
-  if (usr_ptr != NULL && is_user_vaddr (usr_ptr))
-    {
-      return (pagedir_get_page (cur->pagedir, usr_ptr)) != NULL;
-    }
-  return false;
+  struct file_node *fdn;
+
+  fdn = FindFileNode(fd);
+  if (fdn == NULL)
+    return NULL;
+  return fdn->file;
 }
 
-bool is_valid_pointer(void* esp,int cnt){
+bool is_valid_ptr(void* esp,int cnt){
   //为bad-ptr新加
   int i = 0;
   for (; i < cnt; ++i)
@@ -409,4 +522,30 @@ bool is_valid_pointer(void* esp,int cnt){
     }
   }
   return true;
+}
+
+//have a try尝试一下，不知道哪出问题了
+bool is_valid_string(void *str){
+  int ch=-1;
+  while((ch=get_user((uint8_t*)str++))!='\0' && ch!=-1);
+  if(ch=='\0')
+    return true;
+  else
+    return false;
+}
+
+//魔改提供的get_user函数
+static int
+get_user (const uint8_t *uaddr)
+{
+  if(!is_user_vaddr((void *)uaddr)){
+    return -1;
+  }
+  if(pagedir_get_page(thread_current()->pagedir,uaddr)==NULL){
+    return -1;
+  }
+  int result;
+  asm ("movl $1f, %0; movzbl %1, %0; 1:"
+       : "=&a" (result) : "m" (*uaddr));
+  return result;
 }

@@ -569,12 +569,12 @@ bool is_child(tid_t tid,bool delete)
 }
 
 void command_break(char* command,char* argv[],int* argc){
-  char* commands = NULL;
+  char* commands = command;
   *argc=0;
-  commands = malloc(strlen(command)+1);
+  //commands = malloc(strlen(command)+1);
   char* save = NULL;
   char* temp = NULL;
-  strlcpy(commands,command,PGSIZE);
+  //strlcpy(commands,command,PGSIZE);
   temp = strtok_r(commands," ",&save);
   argv[*argc] = temp;
 
