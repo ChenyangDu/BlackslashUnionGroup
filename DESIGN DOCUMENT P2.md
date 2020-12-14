@@ -10,10 +10,10 @@
 
 |  姓名  |   学号   | 权重 |
 | :----: | :------: | :--: |
-| 杜宸洋 | 18373119 | 1.1  |
-| 王熙林 | 18373491 | 1.1  |
-| 任博林 | 18373691 | 1.1  |
-| 高  锐 | 17351046 | 0.7  |
+| 杜宸洋 | 18373119 | 110  |
+| 王熙林 | 18373491 | 110  |
+| 任博林 | 18373691 | 110  |
+| 高  锐 | 17351046 |  70  |
 
 
 
@@ -168,4 +168,3 @@ struct wait_elem{//管道等待元素
 
 ##### B11: The default `tid_t` to `pid_t` mapping is the identity mapping. If you changed it, what advantages are there to your approach?
 我们没有改变它。现在每个进程都对应一个线程。优点则在于如果改变了，那么一个进程就可以对应多个不同的线程。
-##### B11: The default `tid_t` to `pid_t` mapping is the identity mapping. If you changed it, what advantages are there to your approach?
