@@ -91,8 +91,6 @@ start_process (void *file_name_)
   command_break(file_name,argv,&argc);
   success = load (argv[0], &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
-  //palloc_free_page (file_name);
   if (!success)
   {
     pipe_write(thread_current()->tid,THREAD_START,TID_ERROR);
@@ -175,6 +173,9 @@ process_exit (void)
   pipe_write(cur->tid,WAIT_THREAD,cur->ret);
   file_close(cur->exec);
   //TODO : KERNEL 看运行结果
+  if(cur->tid==1){
+    return;
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

@@ -283,11 +283,11 @@ tid_t exec (const char *file)
 
 
 int wait (tid_t pid){
-  if(if_have_waited(thread_current()->tid))
-  {
-    return -1;
-    //已调用wait
-  }
+  // if(if_have_waited(thread_current()->tid))
+  // {
+  //   return -1;
+  //   //已调用wait
+  // }
   return process_wait(pid);
 }
 
@@ -454,6 +454,7 @@ int pipe_read(tid_t p_id,tid_t c_id,int op){
         list_remove(e);
         int value = read->ret_value;
         free(read);
+        intr_set_level(old_level);
         return value;
       }
       
