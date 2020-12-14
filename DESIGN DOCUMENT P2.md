@@ -105,11 +105,18 @@ struct wait_elem{//管道等待元素
     struct file *exec;       /* 此当前进程运行文件 */
 ```
 ##### B2: Describe how file descriptors are associated with open files. Are file descriptors unique within the entire OS or just within a single process?
+
+每次文件被打开时，系统会新建一个文件标识符的结构体，其成员包括被打开的文件的指针，以及一个整个系统内唯一的整数值（用来标识文件）。所以我们的实现中文件标识符对于全系统来说都是唯一的，但进程也会维持一个自己打开的文件的列表。
+
 ### ALGORITHMS 
 
 ##### B3: Describe your code for reading and writing user data from the kernel.
 
+在系统调用读，写时，首先检查传入的帧的所有参数空间是否有效，将文件标识符，buffer，size提取出来后，再检查buffer以及buffer+size的指针是否都有效。如果其中有无效地址，则退出，返回值为-1，否则则继续执行。
+
 ##### B4: Suppose a system call causes a full page (4,096 bytes) of data to be copied from user space into the kernel.  What is the least and the greatest possible number of inspections of the page table (e.g. calls to `pagedir_get_page()`) that might result?  What about for a system call that only copies 2 bytes of data?  Is there room for improvement in these numbers, and how much?
+
+
 
 ##### B5: Briefly describe your implementation of the "wait" system call and how it interacts with process termination.
 
@@ -123,4 +130,5 @@ terminates without waiting, before C exits?  After C exits?  Are there any speci
 
 ##### B9: Why did you choose to implement access to user memory from the kernel in the way that you did?
 ##### B10: What advantages or disadvantages can you see to your design for file descriptors?
+
 ##### B11: The default `tid_t` to `pid_t` mapping is the identity mapping. If you changed it, what advantages are there to your approach?
