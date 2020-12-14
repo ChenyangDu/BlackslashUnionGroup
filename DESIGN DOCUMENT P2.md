@@ -117,10 +117,36 @@ struct wait_elem{//管道等待元素
 ### SYNCHRONIZATION 
 
 ##### B7: The "exec" system call returns -1 if loading the new executable fails, so it cannot return before the new executable has completed loading.  How does your code ensure this?  How is the load success/failure status passed back to the thread that calls "exec"?
-##### B8: Consider parent process P with child process C.  How do you ensure proper synchronization and avoid race conditions when P calls wait(C) before C exits?  After C exits?  How do you ensure that all resources are freed in each case?  How about when P
-terminates without waiting, before C exits?  After C exits?  Are there any special cases?
+
+我们在thread结构体中加入了`ret`变量来保存进程的返回值。子进程可以通过`parent_id`来获得父进程的id，并结合GetThreadByTid()可以获得父进程的访问权。
+
+我们设计的目的是当意外发生的时候，子进程可以随时退出。因此，如果我们将它保存在子进程中，当它在父进程检查之前退出时，就无法获得返回值。
+
+##### B8: Consider parent process P with child process C.  How do you ensure proper synchronization and avoid race conditions when P calls wait(C) before C exits?  After C exits?  How do you ensure that all resources are freed in each case?  How about when P terminates without waiting, before C exits?  After C exits?  Are there any special cases?
+在thread结构体中，我们加入了两个用来记录父子进程的变量。
+```c
+    tid_t parent_id;              /* 父进程*/
+    struct list child_list;      /* 子进程序列 */
+```
+在进程创建的时候，将C添加到P的子进程列表中，并将P添加到C的父进程中。这样做可以确保如果子进程首先执行完，则父进程将指导子进程等待并不会终止。否则，如果子进程仍然存在，父进程会等待子进程。当进程退出的时候，所有的资源都会被释放。
+
+
 ### RATIONALE 
 
 ##### B9: Why did you choose to implement access to user memory from the kernel in the way that you did?
+
+因为这样的实现方式比较容易，因为它允许我们的系统调用实现在一个函数调用中轻松验证对用户内存的访问。
+
 ##### B10: What advantages or disadvantages can you see to your design for file descriptors?
+
+优点：
+
+1.  文件描述符十分简洁。
+2.  记录了所有已经打开的文件，这样可以更加灵活地操作打开的文件。
+   
+缺点：
+
+1. 占用内核空间，用户程序可能会打开大量文件崩溃内核。
+
 ##### B11: The default `tid_t` to `pid_t` mapping is the identity mapping. If you changed it, what advantages are there to your approach?
+我们没有改变它。现在每个进程都对应一个线程。优点则在于如果改变了，那么一个进程就可以对应多个不同的线程。
