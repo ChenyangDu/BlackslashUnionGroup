@@ -64,7 +64,11 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  uint32_t *esp;
+  if(!is_valid_ptr(f->esp,4)){
+    ExitStatus(-1);
+    return;
+  }
+  int *esp;
   esp = f->esp;
   int syscall_num = *esp;
   switch (syscall_num)
