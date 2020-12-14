@@ -116,9 +116,13 @@ struct wait_elem{//管道等待元素
 
 ##### B4: Suppose a system call causes a full page (4,096 bytes) of data to be copied from user space into the kernel.  What is the least and the greatest possible number of inspections of the page table (e.g. calls to `pagedir_get_page()`) that might result?  What about for a system call that only copies 2 bytes of data?  Is there room for improvement in these numbers, and how much?
 
+最少次数为1，最大次数为4096。当`pagedir_get_page()`没有验证指针，且所有数据都存储在单个页面上，则只需调用一次，若数据的字节分布在4096页中，则需要调用4096次。对于2 bytes 数据的情况，最少1次，最多2次。
 
+我们目前没有什么比较好的方法来提高。
 
 ##### B5: Briefly describe your implementation of the "wait" system call and how it interacts with process termination.
+
+系统调用`wait`会直接调用`process_wait`。在这方面我们参考了管道的设计，进程退出时会向一个管道内写入退出信息，当父进程需要等待时，会先检查该管道内是否有需要的子进程的信息，如果有则读取，返回，如果没有则会写入wait请求并阻塞。当一个子进程退出时，会先写入退出信息，然后检查有没有父进程的wait请求，有的话就会唤醒父进程。
 
 ##### B6: Any access to user program memory at a user-specified address can fail due to a bad pointer value.  Such accesses must cause the process to be terminated.  System calls are fraught with such accesses, e.g. a "write" system call requires reading the system call number from the user stack, then each of the call's three arguments, then an arbitrary amount of user memory, and any of these can fail at any point.  This poses a design and error-handling problem: how do you best avoid obscuring the primary function of code in a morass of error-handling?  Furthermore, when an error is detected, how do you ensure that all temporarily allocated resources (locks, buffers, etc.) are freed?  In a few paragraphs, describe the strategy or strategies you adopted for managing these issues.  Give an example.
 ### SYNCHRONIZATION 
