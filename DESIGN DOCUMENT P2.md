@@ -66,7 +66,7 @@ strtok_r()更具线程安全性。它是可重入的，以避免另一个线程�
 
 1. 在内核级别减少了不必要的工作，可以缩短运行的时间。
 2. 在将可执行文件传递给内核之前检查它是否存在，以避免内核错误，保证了可靠性。
-
+<div STYLE="page-break-after: always;"></div>
 # SYSTEM CALLS
 
 ### DATA STRUCTURES ----
