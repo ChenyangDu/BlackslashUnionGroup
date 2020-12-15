@@ -24,7 +24,6 @@
 ##### Please cite any offline or online sources you consulted while preparing your submission, other than the Pintos documentation, course text, lecture notes, and course staff.
 
 <div STYLE="page-break-after: always;"></div>
-
 # ARGUMENT PASSING
 
 
@@ -42,7 +41,7 @@ None.
 
 ##### How do you avoid overflowing the stack page?
 
-对于参数传递问题，我们在start_process函数中进行处理。为了更加便捷地处理字符串，我们新建了command_break函数。为了保证使参数的顺序正确，我们从后向前倒序扫描参数字符串，因此我们得到的第一个标记是最后一个参数，我们得到的最后一个标记是第一个参数。我们可以继续减少esp指针以设置argv[]元素。代码如下所示：
+对于参数传递问题，我们在`start_process()`函数中进行处理。为了更加便捷地处理字符串，我们新建了`command_break()`函数。为了保证使参数的顺序正确，我们从后向前倒序扫描参数字符串，因此我们得到的第一个标记是最后一个参数，我们得到的最后一个标记是第一个参数。我们可以继续减少`esp`指针以设置`argv[]`元素。代码如下所示：
 ```c
 int i=argc;
 char* addr_arr[100];//存地址
@@ -52,6 +51,10 @@ while(--i>=0){
     memcpy(if_.esp,argv[i],strlen(argv[i])+1);
 }
 ```
+
+在获取所有参数之后按照文档中所提示的顺序对esp栈帧以及相关数据进行操作即可，具体详见start_process()函数。
+
+为了避免栈溢出，我们将参数数组大小限制在100。
 
 ### RATIONALE 
 
@@ -136,9 +139,9 @@ struct wait_elem{//管道等待元素
 
 ##### B7: The "exec" system call returns -1 if loading the new executable fails, so it cannot return before the new executable has completed loading.  How does your code ensure this?  How is the load success/failure status passed back to the thread that calls "exec"?
 
-我们在thread结构体中加入了`ret`变量来保存进程的返回值。子进程可以通过`parent_id`来获得父进程的id，并结合GetThreadByTid()可以获得父进程的访问权。
+我们在thread结构体中加入了`ret`变量来保存进程的返回值。子进程可以通过`parent_id`来获得父进程的id，并结合`GetThreadByTid()`可以获得父进程的访问权。
 
-我们设计的目的是当意外发生的时候，子进程可以随时退出。因此，如果我们将它保存在子进程中，当它在父进程检查之前退出时，就无法获得返回值。
+我们设计的目的是当意外发生的时候，子进程可以随时调用全局的退出函数`ExitStatus()`​。因此，如果我们将它保存在子进程中，当它在父进程检查之前退出时，就无法获得返回值。
 
 ##### B8: Consider parent process P with child process C.  How do you ensure proper synchronization and avoid race conditions when P calls wait(C) before C exits?  After C exits?  How do you ensure that all resources are freed in each case?  How about when P terminates without waiting, before C exits?  After C exits?  Are there any special cases?
 在thread结构体中，我们加入了两个用来记录父子进程的变量。
@@ -161,7 +164,7 @@ struct wait_elem{//管道等待元素
 
 1.  文件描述符十分简洁。
 2.  记录了所有已经打开的文件，这样可以更加灵活地操作打开的文件。
-   
+
 缺点：
 
 1. 占用内核空间，用户程序可能会打开大量文件崩溃内核。
