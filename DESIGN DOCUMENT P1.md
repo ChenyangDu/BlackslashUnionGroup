@@ -107,7 +107,7 @@
 ```
 
 ##### B2: Explain the data structure used to track priority donation. Use ASCII art to diagram a nested donation.  (Alternately, submit a .png file.)
-![](/img/thread-priority.png)
+![](./img/thread-priority.png)
 
 在锁的结构体中添加锁当前的持有线程，在任意线程获得锁的时候，检查当前的锁，如果当前锁的最大优先级小于当前线程的优先级，则将当前锁的最大优先级更新，然后取得当前锁的持有线程（当前锁未被当前线程获取），如果该线程此时被其他锁阻塞，则将当前检查的锁更新为阻塞该线程的锁，继续检查，直到确保所有相关锁的最大优先级不小于当前线程的优先级。在每次检查的过程中，随着锁优先级的更新，也要对持有该锁的线程中的锁队列进行排序，确保线程中锁队列是一个优先队列，并且将线程的优先级保持为队列第一个锁的最大优先级（如果自身的初始优先级更大则保持自身优先级）。
 
